@@ -7,9 +7,9 @@ venv/
 .idea/
 .vscode/
 logs/
-media/posters/*
-media/videos/*
-media/music/*
+# media/posters/*
+# media/videos/*
+# media/music/*
 !media/.gitkeep
 alembic/versions/*.py
 !alembic/versions/.gitkeep
