@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aerohub_db
+    environment:
+      POSTGRES_DB: aerohub_db
+      POSTGRES_USER: aerohub
+      POSTGRES_PASSWORD: aerohub_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aerohub -d aerohub_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: aerohub_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aerohub:aerohub_pass@db:5432/aerohub_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-32chars!!}
+      DEBUG: ${DEBUG:-true}
+      MEDIA_ROOT: /app/media
+      LOG_FILE: /app/logs/aerohub.log
+      CORS_ALLOW_ALL: "true"
+    volumes:
+      - .:/app                          # hot reload
+      - media_data:/app/media
+      - log_data:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_data:
+  log_data:
