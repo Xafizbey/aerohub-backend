@@ -6,8 +6,14 @@ from pydantic import BaseModel, Field
 
 class CategoryBase(BaseModel):
     name: str = Field(max_length=100)
+    name_ru: str | None = None
+    name_kk: str | None = None
+    name_ky: str | None = None
     slug: str = Field(max_length=100)
     description: str | None = None
+    description_ru: str | None = None
+    description_kk: str | None = None
+    description_ky: str | None = None
 
 
 class CategoryCreate(CategoryBase):
@@ -23,9 +29,11 @@ class MovieBase(BaseModel):
     title: str = Field(max_length=255)
     title_ru: str | None = None
     title_kk: str | None = None
+    title_ky: str | None = None
     description: str | None = None
     description_ru: str | None = None
     description_kk: str | None = None
+    description_ky: str | None = None
     year: int | None = Field(default=None, ge=1900, le=2100)
     duration_minutes: int | None = Field(default=None, ge=1)
     rating: float | None = Field(default=None, ge=0, le=10)
@@ -42,9 +50,11 @@ class MovieUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     title_ru: str | None = None
     title_kk: str | None = None
+    title_ky: str | None = None
     description: str | None = None
     description_ru: str | None = None
     description_kk: str | None = None
+    description_ky: str | None = None
     year: int | None = None
     duration_minutes: int | None = None
     rating: float | None = None
@@ -73,11 +83,13 @@ class MovieListOut(BaseModel):
     title: str
     title_ru: str | None
     title_kk: str | None
+    title_ky: str | None
     year: int | None
     duration_minutes: int | None
     rating: float | None
     language: str | None
     poster_path: str | None
+    video_path: str | None
     hls_path: str | None
     view_count: int
     category: CategoryOut | None

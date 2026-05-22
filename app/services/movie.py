@@ -78,6 +78,7 @@ async def list_movies(
                 Movie.title.ilike(pattern),
                 Movie.title_ru.ilike(pattern),
                 Movie.title_kk.ilike(pattern),
+                Movie.title_ky.ilike(pattern),
                 Movie.description.ilike(pattern),
             )
         )

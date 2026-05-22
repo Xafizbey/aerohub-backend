@@ -15,9 +15,15 @@ class Music(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_ru: Mapped[str | None] = mapped_column(String(255))
+    title_kk: Mapped[str | None] = mapped_column(String(255))
+    title_ky: Mapped[str | None] = mapped_column(String(255))
     artist: Mapped[str] = mapped_column(String(255), nullable=False)
     album: Mapped[str | None] = mapped_column(String(255))
     genre: Mapped[str | None] = mapped_column(String(100))
+    genre_ru: Mapped[str | None] = mapped_column(String(100))
+    genre_kk: Mapped[str | None] = mapped_column(String(100))
+    genre_ky: Mapped[str | None] = mapped_column(String(100))
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     year: Mapped[int | None] = mapped_column(Integer)
     language: Mapped[str | None] = mapped_column(String(10))
@@ -54,7 +60,13 @@ class Playlist(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name_ru: Mapped[str | None] = mapped_column(String(255))
+    name_kk: Mapped[str | None] = mapped_column(String(255))
+    name_ky: Mapped[str | None] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
+    description_ru: Mapped[str | None] = mapped_column(Text)
+    description_kk: Mapped[str | None] = mapped_column(Text)
+    description_ky: Mapped[str | None] = mapped_column(Text)
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )

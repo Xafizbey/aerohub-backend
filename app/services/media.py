@@ -60,6 +60,33 @@ async def upload_audio(file: UploadFile) -> str:
     return relative
 
 
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mpeg", ".mov", ".avi", ".mkv", ".webm"}
+
+
+async def upload_video(file: UploadFile) -> str:
+    suffix = Path(file.filename or "file").suffix.lower() or ".mp4"
+    if suffix not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported video format. Allowed: {', '.join(ALLOWED_VIDEO_EXTENSIONS)}",
+        )
+
+    filename = f"{uuid.uuid4()}{suffix}"
+    path = _save_path("videos", filename)
+
+    # Stream to disk in 4MB chunks to handle large video files
+    with open(path, "wb") as f:
+        while True:
+            chunk = await file.read(4 * 1024 * 1024)
+            if not chunk:
+                break
+            f.write(chunk)
+
+    relative = f"media/videos/{filename}"
+    logger.info("Video saved: %s", relative)
+    return relative
+
+
 def register_hls_path(hls_path: str) -> str:
     """Validate and normalise an HLS path supplied by admin."""
     p = Path(hls_path)

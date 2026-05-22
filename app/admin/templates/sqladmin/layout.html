@@ -1,0 +1,680 @@
+{% extends "sqladmin/base.html" %}
+{% from 'sqladmin/_macros.html' import display_menu %}
+
+{% block head %}
+{# ── Prevent flash of unstyled theme ──────────────────── #}
+<script>
+  (function(){
+    var t = localStorage.getItem('ah-theme') || 'dark';
+    document.documentElement.setAttribute('data-bs-theme', t);
+  })();
+</script>
+
+<style>
+/* =============================================================
+   AeroHub Admin — Custom Theme (dark + light)
+   IMPORTANT: never set position on .navbar-vertical —
+   Tabler owns position:fixed for the sidebar.
+============================================================= */
+
+:root {
+  --ah-sb-w:   260px;
+  --ah-blue:   #3b82f6;
+  --ah-cyan:   #06b6d4;
+  --ah-glow:   rgba(59,130,246,0.25);
+  --ah-font:   -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+/* ── Sidebar width (Tabler keeps position:fixed) ─────────── */
+.navbar-vertical.navbar-expand-lg {
+  width: var(--ah-sb-w) !important;
+  overflow-y: auto !important;         /* auto, not always-on scroll */
+}
+
+/* Push page content right of sidebar */
+.navbar-expand-lg.navbar-vertical ~ .page-wrapper {
+  margin-left: var(--ah-sb-w) !important;
+}
+
+/* Sidebar container: column flex so brand/nav/footer stack */
+.navbar-vertical.navbar-expand-lg > .container-fluid,
+.navbar-vertical.navbar-expand-lg > [class^="container"] {
+  display:        flex        !important;
+  flex-direction: column      !important;
+  min-height:     100vh       !important;
+  padding:        0           !important;
+  overflow:       hidden;
+}
+
+/* ── Dark sidebar ─────────────────────────────────────────── */
+[data-bs-theme="dark"] .navbar-vertical.navbar-expand-lg {
+  background:   #0d1424                          !important;
+  border-right: 1px solid rgba(255,255,255,.06)  !important;
+  box-shadow:   2px 0 28px rgba(0,0,0,.45)       !important;
+}
+
+/* decorative right-edge glow line */
+[data-bs-theme="dark"] .navbar-vertical.navbar-expand-lg::after {
+  content: '';
+  position: absolute; top: 0; right: 0;
+  width: 1px; height: 100%;
+  background: linear-gradient(180deg,
+    transparent 0%, var(--ah-blue) 30%,
+    var(--ah-cyan) 70%, transparent 100%);
+  opacity: .28;
+  pointer-events: none;
+}
+
+/* ── Light sidebar ─────────────────────────────────────────── */
+[data-bs-theme="light"] .navbar-vertical.navbar-expand-lg {
+  background:   #ffffff                       !important;
+  border-right: 1px solid rgba(0,0,0,.09)     !important;
+  box-shadow:   2px 0 18px rgba(0,0,0,.06)   !important;
+}
+
+/* ── Brand ────────────────────────────────────────────────── */
+.ah-brand {
+  display: flex; align-items: center; gap: .7rem;
+  padding: 1.2rem 1.1rem;
+  border-bottom: 1px solid;
+  text-decoration: none !important;
+  flex-shrink: 0;
+}
+[data-bs-theme="dark"]  .ah-brand { border-color: rgba(255,255,255,.07); background: #080f1e; }
+[data-bs-theme="light"] .ah-brand { border-color: rgba(0,0,0,.08);       background: #f8fafc; }
+
+.ah-brand-plane {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 0 14px rgba(59,130,246,.35);
+}
+
+.ah-brand-name {
+  display: block; font-size: .98rem; font-weight: 700; letter-spacing: -.3px;
+  background: linear-gradient(135deg, #93c5fd, #67e8f9);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  font-family: var(--ah-font);
+}
+
+.ah-brand-sub {
+  display: block; font-size: .63rem; font-weight: 600;
+  letter-spacing: .8px; text-transform: uppercase; margin-top: 1px;
+  font-family: var(--ah-font);
+}
+[data-bs-theme="dark"]  .ah-brand-sub { color: #2d4a78; }
+[data-bs-theme="light"] .ah-brand-sub { color: #94a3b8; }
+
+/* ── Nav scroll wrapper ───────────────────────────────────── */
+.ah-nav-scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: .5rem 0 .75rem;
+}
+.ah-nav-scroll::-webkit-scrollbar { width: 3px; }
+.ah-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+[data-bs-theme="dark"]  .ah-nav-scroll::-webkit-scrollbar-thumb { background: rgba(99,157,255,.15); border-radius: 2px; }
+[data-bs-theme="light"] .ah-nav-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12);      border-radius: 2px; }
+
+.ah-nav-list { list-style: none; margin: 0; padding: 0; }
+.ah-nav-section { margin-top: .2rem; }
+
+/* ── Section labels ───────────────────────────────────────── */
+.ah-section-label {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .85rem 1.1rem .3rem;
+  font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px;
+  pointer-events: none; user-select: none; font-family: var(--ah-font);
+}
+[data-bs-theme="dark"]  .ah-section-label { color: #263f66; }
+[data-bs-theme="light"] .ah-section-label { color: #b0bbc9; }
+
+/* ── Nav links ────────────────────────────────────────────── */
+.ah-nav-link {
+  display: flex !important; align-items: center; gap: .6rem;
+  padding: .46rem 1rem .46rem 1.1rem;
+  margin: 1px .55rem;
+  border-radius: 8px; border-left: 2px solid transparent;
+  font-size: .84rem; font-weight: 500; font-family: var(--ah-font);
+  text-decoration: none !important; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s, transform .13s;
+}
+
+[data-bs-theme="dark"]  .ah-nav-link              { color: #7b90b0 !important; }
+[data-bs-theme="dark"]  .ah-nav-link:hover         { background: rgba(99,157,255,.07); color: #cdd9ec !important; border-left-color: rgba(59,130,246,.35); transform: translateX(2px); }
+[data-bs-theme="dark"]  .ah-nav-link.active        { background: rgba(59,130,246,.12); color: #93c5fd !important; border-left-color: var(--ah-blue); font-weight: 600; }
+
+[data-bs-theme="light"] .ah-nav-link              { color: #64748b !important; }
+[data-bs-theme="light"] .ah-nav-link:hover         { background: rgba(59,130,246,.07); color: #1e293b !important; border-left-color: rgba(59,130,246,.35); transform: translateX(2px); }
+[data-bs-theme="light"] .ah-nav-link.active        { background: rgba(59,130,246,.09); color: #2563eb !important; border-left-color: #2563eb; font-weight: 600; }
+
+/* ── Nav icon ─────────────────────────────────────────────── */
+.ah-nav-icon { width: 1.2rem; text-align: center; font-size: .82rem; flex-shrink: 0; transition: opacity .15s, color .15s; }
+
+[data-bs-theme="dark"]  .ah-nav-link .ah-nav-icon { opacity: .55; }
+[data-bs-theme="dark"]  .ah-nav-link:hover .ah-nav-icon,
+[data-bs-theme="dark"]  .ah-nav-link.active .ah-nav-icon { opacity: 1; color: var(--ah-cyan); }
+
+[data-bs-theme="light"] .ah-nav-link .ah-nav-icon { opacity: .6; }
+[data-bs-theme="light"] .ah-nav-link:hover .ah-nav-icon,
+[data-bs-theme="light"] .ah-nav-link.active .ah-nav-icon { opacity: 1; color: var(--ah-blue); }
+
+/* ── Active pip dot (right side) ──────────────────────────── */
+.ah-nav-pip {
+  margin-left: auto; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--ah-blue);
+  box-shadow: 0 0 5px var(--ah-glow); flex-shrink: 0;
+}
+
+/* ── Sidebar footer ───────────────────────────────────────── */
+.ah-sidebar-footer {
+  flex-shrink: 0; margin-top: auto;
+  padding: .7rem .75rem 1rem;
+}
+[data-bs-theme="dark"]  .ah-sidebar-footer { border-top: 1px solid rgba(255,255,255,.06); }
+[data-bs-theme="light"] .ah-sidebar-footer { border-top: 1px solid rgba(0,0,0,.07); }
+
+/* theme toggle button */
+.ah-theme-btn {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  width: 100%; padding: .48rem .75rem; margin-bottom: .4rem;
+  border-radius: 8px; border: 1px solid;
+  font-size: .79rem; font-weight: 500; font-family: var(--ah-font);
+  cursor: pointer; transition: background .15s;
+}
+[data-bs-theme="dark"]  .ah-theme-btn { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.09); color: #7b90b0; }
+[data-bs-theme="dark"]  .ah-theme-btn:hover { background: rgba(255,255,255,.09); color: #c9d1d9; }
+[data-bs-theme="light"] .ah-theme-btn { background: rgba(0,0,0,.03);       border-color: rgba(0,0,0,.1);         color: #64748b; }
+[data-bs-theme="light"] .ah-theme-btn:hover { background: rgba(0,0,0,.07); color: #1e293b; }
+
+/* logout button */
+.ah-logout-btn {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  width: 100%; padding: .46rem .75rem;
+  border-radius: 8px; border: 1px solid rgba(239,68,68,.22);
+  background: rgba(239,68,68,.07); color: #f87171 !important;
+  font-size: .79rem; font-weight: 500; font-family: var(--ah-font);
+  text-decoration: none !important; transition: background .15s, border-color .15s;
+}
+.ah-logout-btn:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.38); }
+
+/* ── Dark overrides for Tabler page/components ────────────── */
+[data-bs-theme="dark"] body           { background: #0b1120 !important; color: #c9d1d9 !important; }
+[data-bs-theme="dark"] .page-wrapper  { background: #0b1120 !important; }
+[data-bs-theme="dark"] .page-header   { border-bottom-color: rgba(255,255,255,.06) !important; }
+[data-bs-theme="dark"] .page-title    { color: #e2e8f0 !important; }
+[data-bs-theme="dark"] .page-pretitle { color: #3d5278 !important; }
+
+[data-bs-theme="dark"] .card        { background: #111827 !important; border-color: rgba(255,255,255,.06) !important; box-shadow: 0 4px 18px rgba(0,0,0,.35) !important; }
+[data-bs-theme="dark"] .card-header { background: transparent !important; border-color: rgba(255,255,255,.06) !important; }
+[data-bs-theme="dark"] .card-title  { color: #e2e8f0 !important; }
+
+[data-bs-theme="dark"] .table                          { color: #adb8c8 !important; }
+[data-bs-theme="dark"] .table > thead > tr > th        { background: rgba(0,0,0,.25) !important; color: #3d5278 !important; font-size: .7rem !important; text-transform: uppercase !important; letter-spacing: .7px !important; border-color: rgba(255,255,255,.05) !important; }
+[data-bs-theme="dark"] .table > tbody > tr > td        { border-color: rgba(255,255,255,.04) !important; }
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > td { background: rgba(59,130,246,.05) !important; }
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select  { background: rgba(0,0,0,.3) !important; border-color: rgba(255,255,255,.1) !important; color: #d1dae8 !important; }
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus { border-color: var(--ah-blue) !important; box-shadow: 0 0 0 3px rgba(59,130,246,.18) !important; }
+[data-bs-theme="dark"] .form-label { color: #64748b !important; }
+
+[data-bs-theme="dark"] .dropdown-menu   { background: #1a2235 !important; border-color: rgba(255,255,255,.07) !important; border-radius: 10px !important; box-shadow: 0 8px 28px rgba(0,0,0,.5) !important; }
+[data-bs-theme="dark"] .dropdown-item   { color: #8b9ab5 !important; border-radius: 6px; margin: 1px 4px; }
+[data-bs-theme="dark"] .dropdown-item:hover { background: rgba(99,157,255,.1) !important; color: #e2e8f0 !important; }
+
+[data-bs-theme="dark"] .pagination .page-link           { background: #111827 !important; border-color: rgba(255,255,255,.07) !important; color: #4b6280 !important; }
+[data-bs-theme="dark"] .page-item.active .page-link     { background: var(--ah-blue) !important; border-color: var(--ah-blue) !important; color: #fff !important; }
+
+[data-bs-theme="dark"] .badge.bg-success { background: rgba(16,185,129,.18)  !important; color: #6ee7b7 !important; }
+[data-bs-theme="dark"] .badge.bg-danger  { background: rgba(239,68,68,.18)   !important; color: #fca5a5 !important; }
+[data-bs-theme="dark"] .badge.bg-warning { background: rgba(245,158,11,.18)  !important; color: #fcd34d !important; }
+[data-bs-theme="dark"] .badge.bg-info    { background: rgba(6,182,212,.18)   !important; color: #67e8f9 !important; }
+
+[data-bs-theme="dark"] .alert { border-color: rgba(255,255,255,.08) !important; }
+
+[data-bs-theme="dark"] .select2-dropdown { background: #1a2235 !important; border-color: rgba(255,255,255,.08) !important; }
+[data-bs-theme="dark"] .select2-container--default .select2-selection--single,
+[data-bs-theme="dark"] .select2-container--default .select2-selection--multiple { background: rgba(0,0,0,.3) !important; border-color: rgba(255,255,255,.1) !important; }
+[data-bs-theme="dark"] .select2-container--default .select2-results__option { color: #8b9ab5; }
+[data-bs-theme="dark"] .select2-container--default .select2-results__option--highlighted { background: rgba(59,130,246,.2) !important; }
+
+[data-bs-theme="dark"] .flatpickr-calendar { background: #1a2235 !important; border-color: rgba(255,255,255,.08) !important; box-shadow: 0 8px 28px rgba(0,0,0,.5) !important; }
+[data-bs-theme="dark"] .flatpickr-day.selected { background: var(--ah-blue) !important; border-color: var(--ah-blue) !important; }
+
+/* ── Shared polish (both themes) ──────────────────────────── */
+.btn           { border-radius: 7px !important; }
+.btn-primary   { background: var(--ah-blue) !important; border-color: var(--ah-blue) !important; }
+.btn-primary:hover { background: #2563eb !important; box-shadow: 0 4px 14px var(--ah-glow) !important; }
+.card          { border-radius: 12px !important; }
+.form-control, .form-select { border-radius: 8px !important; }
+
+@media (min-width: 992px) { .navbar-toggler { display: none !important; } }
+
+/* ── Language selector ────────────────────────────────────── */
+.ah-lang-bar {
+  display: flex; gap: 3px;
+  width: 100%; margin-bottom: .4rem;
+  border-radius: 8px; padding: 3px;
+  border: 1px solid;
+}
+[data-bs-theme="dark"]  .ah-lang-bar { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.07); }
+[data-bs-theme="light"] .ah-lang-bar { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.09); }
+
+.ah-lang-btn {
+  flex: 1; padding: .3rem 0;
+  border: none; border-radius: 6px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .5px;
+  font-family: var(--ah-font); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+[data-bs-theme="dark"]  .ah-lang-btn          { background: transparent; color: #3d5278; }
+[data-bs-theme="dark"]  .ah-lang-btn:hover    { color: #7b90b0; }
+[data-bs-theme="dark"]  .ah-lang-btn.active   { background: rgba(59,130,246,.18); color: #93c5fd; }
+[data-bs-theme="light"] .ah-lang-btn          { background: transparent; color: #94a3b8; }
+[data-bs-theme="light"] .ah-lang-btn:hover    { color: #475569; }
+[data-bs-theme="light"] .ah-lang-btn.active   { background: rgba(59,130,246,.12); color: #2563eb; }
+
+/* ── Multilingual field groups ────────────────────────────── */
+.ah-field { position: relative; }
+.ah-lang-row {
+  border-left: 2px solid rgba(59,130,246,.2);
+  padding-left: .6rem;
+  margin-left: 0 !important;
+  margin-bottom: 1rem !important;
+}
+.ah-lang-badge {
+  display: inline-block;
+  font-size: .6rem; font-weight: 700; letter-spacing: .4px;
+  padding: .1em .4em; border-radius: 4px;
+  border: 1px solid var(--ah-blue);
+  color: var(--ah-blue) !important;
+  background: transparent !important;
+  vertical-align: middle; line-height: 1.4;
+}
+[data-bs-theme="dark"]  .ah-lang-badge { border-color: rgba(59,130,246,.5); color: #93c5fd !important; }
+[data-bs-theme="light"] .ah-lang-badge { border-color: rgba(37,99,235,.4); color: #2563eb !important; }
+.ah-lang-row .form-label { font-size: .8rem; margin-bottom: .3rem; }
+</style>
+{% endblock %}
+
+{# ═══════════════════════════════════════════════════════════ #}
+{% block body %}
+<div class="wrapper">
+
+  {# ── SIDEBAR ─────────────────────────────────────────────── #}
+  <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+
+      {# Brand #}
+      <a href="{{ url_for('admin:index') }}" class="ah-brand">
+        <div class="ah-brand-plane">✈</div>
+        {% if admin.logo_url %}
+        <img src="{{ admin.logo_url }}" height="36" alt="{{ admin.title }}">
+        {% else %}
+        <div>
+          <span class="ah-brand-name">{{ admin.title }}</span>
+          <span class="ah-brand-sub">Control Panel</span>
+        </div>
+        {% endif %}
+      </a>
+
+      {# Navigation items #}
+      <div class="ah-nav-scroll">
+        {{ display_menu(admin._menu, request) }}
+      </div>
+
+      {# Footer: language + theme + logout #}
+      <div class="ah-sidebar-footer">
+        {# Language selector #}
+        <div class="ah-lang-bar" id="ah-lang-bar">
+          <button class="ah-lang-btn" data-lang="en" type="button">EN</button>
+          <button class="ah-lang-btn" data-lang="ru" type="button">RU</button>
+        </div>
+        {# Theme toggle #}
+        <button class="ah-theme-btn" id="ah-theme-toggle" type="button">
+          <i class="fa-solid fa-fw" id="ah-theme-icon"></i>
+          <span id="ah-theme-label"></span>
+        </button>
+        {% if admin.authentication_backend %}
+        <a href="{{ request.url_for('admin:logout') }}" class="ah-logout-btn" id="ah-logout-link">
+          <i class="fa-solid fa-right-from-bracket fa-fw"></i>
+          <span data-i18n="Sign Out">Sign Out</span>
+        </a>
+        {% endif %}
+      </div>
+
+    </div>
+  </aside>
+
+  {# ── PAGE CONTENT ─────────────────────────────────────────── #}
+  <div class="page-wrapper">
+    <div class="container-fluid">
+      <div class="page-header d-print-none">
+        {% block content_header %}
+        <div class="row align-items-center">
+          <div class="col">
+            <h2 class="page-title">{{ title }}</h2>
+            <div class="page-pretitle">{{ subtitle }}</div>
+          </div>
+        </div>
+        {% endblock %}
+      </div>
+    </div>
+    <div class="page-body flex-grow-1">
+      <div class="container-fluid">
+        <div class="row row-deck row-cards">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block tail %}
+<script>
+(function () {
+'use strict';
+
+/* ═══════════════════════════════════════════
+   1. THEME toggle
+═══════════════════════════════════════════ */
+var themeBtn  = document.getElementById('ah-theme-toggle');
+var themeIcon = document.getElementById('ah-theme-icon');
+var themeLbl  = document.getElementById('ah-theme-label');
+
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-bs-theme', t);
+  if (t === 'dark') {
+    themeIcon.className   = 'fa-solid fa-sun fa-fw';
+    themeLbl.textContent  = i18n('Light mode');
+  } else {
+    themeIcon.className   = 'fa-solid fa-moon fa-fw';
+    themeLbl.textContent  = i18n('Dark mode');
+  }
+}
+
+themeBtn.addEventListener('click', function () {
+  var next = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('ah-theme', next);
+  applyTheme(next);
+});
+
+/* ═══════════════════════════════════════════
+   2. TRANSLATIONS dictionary  (en → ru)
+═══════════════════════════════════════════ */
+var T = {
+  /* ── Sidebar navigation ─────────────── */
+  'Users': 'Пользователи',
+  'User': 'Пользователь',
+  'Movies': 'Фильмы',
+  'Movie': 'Фильм',
+  'Movie Categories': 'Категории фильмов',
+  'Category': 'Категория',
+  'Music': 'Музыка',
+  'Track': 'Трек',
+  'Playlists': 'Плейлисты',
+  'Playlist': 'Плейлист',
+  'Banners': 'Баннеры',
+  'Banner': 'Баннер',
+  'Flight Info': 'Информация о рейсе',
+  'Flight': 'Рейс',
+  'View History': 'История просмотров',
+  'View': 'Просмотр',
+  'Play History': 'История прослушиваний',
+  'Play': 'Прослушивание',
+  /* ── Sidebar categories ─────────────── */
+  'Accounts': 'Аккаунты',
+  'Content': 'Контент',
+  'Analytics': 'Аналитика',
+  /* ── Sidebar controls ───────────────── */
+  'Light mode': 'Светлая тема',
+  'Dark mode': 'Тёмная тема',
+  'Sign Out': 'Выйти',
+  'Control Panel': 'Панель управления',
+  /* ── Buttons ────────────────────────── */
+  'Save': 'Сохранить',
+  'Cancel': 'Отмена',
+  'Delete': 'Удалить',
+  'Edit': 'Изменить',
+  'Create': 'Создать',
+  'Export': 'Экспорт',
+  'Search': 'Поиск',
+  'Apply': 'Применить',
+  'Reset': 'Сброс',
+  'Back': 'Назад',
+  'Confirm': 'Подтвердить',
+  'Yes, delete!': 'Да, удалить!',
+  'Actions': 'Действия',
+  /* ── Column labels ──────────────────── */
+  'Username': 'Имя пользователя',
+  'Email': 'Email',
+  'Full Name': 'Полное имя',
+  'Seat': 'Место',
+  'Role': 'Роль',
+  'Active': 'Активен',
+  'Joined': 'Регистрация',
+  'Updated': 'Обновлено',
+  'Created': 'Создано',
+  'Title (EN)': 'Название (EN)',
+  'Title (RU)': 'Название (RU)',
+  'Title (KZ)': 'Название (KZ)',
+  'Title (KY)': 'Название (KY)',
+  'Description (EN)': 'Описание (EN)',
+  'Description (RU)': 'Описание (RU)',
+  'Description (KZ)': 'Описание (KZ)',
+  'Description (KY)': 'Описание (KY)',
+  'Year': 'Год',
+  'Duration (min)': 'Длительность (мин)',
+  'Rating': 'Рейтинг',
+  'Language': 'Язык',
+  'Poster Path': 'Путь к постеру',
+  'Video Path': 'Путь к видео',
+  'HLS Path': 'HLS путь',
+  'Views': 'Просмотры',
+  'Published': 'Опубликовано',
+  'Artist': 'Исполнитель',
+  'Album': 'Альбом',
+  'Genre': 'Жанр',
+  'Duration (s)': 'Длительность (с)',
+  'Plays': 'Прослушиваний',
+  'Cover Path': 'Путь к обложке',
+  'Audio Path': 'Путь к аудио',
+  'Name': 'Название',
+  'Description': 'Описание',
+  'Owner': 'Владелец',
+  'Title': 'Название',
+  'Subtitle': 'Подзаголовок',
+  'Body Text': 'Текст',
+  'Image Path': 'Путь к изображению',
+  'Link URL': 'Ссылка',
+  'Order': 'Порядок',
+  'Flight №': 'Рейс №',
+  'From (IATA)': 'Откуда (IATA)',
+  'Origin City': 'Город вылета',
+  'To (IATA)': 'Куда (IATA)',
+  'Destination City': 'Город назначения',
+  'Departure': 'Вылет',
+  'Arrival': 'Прилёт',
+  'Aircraft': 'Воздушное судно',
+  'Altitude (ft)': 'Высота (фут)',
+  'Speed (km/h)': 'Скорость (км/ч)',
+  'Temp (°C)': 'Температура (°C)',
+  'Active Flight': 'Текущий рейс',
+  'Watched (s)': 'Просмотрено (с)',
+  'Completed': 'Завершено',
+  'Viewed At': 'Просмотрено в',
+  'Played (s)': 'Прослушано (с)',
+  'Played At': 'Прослушано в',
+  'Slug': 'Слаг',
+  /* ── Page titles ────────────────────── */
+  'List': 'Список',
+  'Detail': 'Детали',
+  'Create': 'Создать',
+  'Edit': 'Изменить',
+  'Dashboard': 'Главная',
+  /* ── Pagination ─────────────────────── */
+  'per page': 'на странице',
+  'items': 'записей',
+  'of': 'из',
+  /* ── Filters ────────────────────────── */
+  'Filters': 'Фильтры',
+  'No records found.': 'Записи не найдены.',
+  'Select': 'Выбрать',
+};
+
+/* i18n() returns translation or original */
+function i18n(key) {
+  var lang = localStorage.getItem('ah-lang') || 'en';
+  return (lang === 'ru' && T[key]) ? T[key] : key;
+}
+
+/* ═══════════════════════════════════════════
+   3. BUILD reverse dictionary  RU → EN
+═══════════════════════════════════════════ */
+var T_rev = {};
+for (var _k in T) { T_rev[T[_k]] = _k; }
+
+/* ═══════════════════════════════════════════
+   4. DOM walker — applies any dict to text nodes
+═══════════════════════════════════════════ */
+function walkAndTranslate(root, dict) {
+  var walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        var p = node.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (['SCRIPT','STYLE','CODE','PRE','INPUT','TEXTAREA']
+              .indexOf(p.tagName) !== -1) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  var node;
+  while ((node = walker.nextNode())) {
+    var orig = node.nodeValue.trim();
+    if (orig && dict[orig]) {
+      node.nodeValue = node.nodeValue.replace(orig, dict[orig]);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   5. LANGUAGE toggle
+═══════════════════════════════════════════ */
+function setLang(lang) {
+  localStorage.setItem('ah-lang', lang);
+
+  /* Apply the right dictionary:
+     switching TO Russian  → use T     (EN → RU)
+     switching TO English  → use T_rev (RU → EN)  ← this was missing before */
+  walkAndTranslate(document.body, lang === 'ru' ? T : T_rev);
+
+  /* Mark active button */
+  document.querySelectorAll('.ah-lang-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+
+  /* Re-render theme button label in correct language */
+  applyTheme(document.documentElement.getAttribute('data-bs-theme') || 'dark');
+}
+
+/* Attach click handlers to language buttons */
+document.querySelectorAll('.ah-lang-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() { setLang(this.dataset.lang); });
+});
+
+/* ═══════════════════════════════════════════
+   6. INIT — run on every page load
+═══════════════════════════════════════════ */
+var savedTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+applyTheme(savedTheme);
+
+var savedLang = localStorage.getItem('ah-lang') || 'en';
+/* Mark active language button */
+document.querySelectorAll('.ah-lang-btn').forEach(function(b) {
+  b.classList.toggle('active', b.dataset.lang === savedLang);
+});
+/* Page is always served in English — translate once on load if RU is active */
+if (savedLang === 'ru') {
+  walkAndTranslate(document.body, T);
+}
+
+/* ═══════════════════════════════════════════
+   7. MULTILINGUAL FIELD GROUPING
+   Finds title/title_ru/title_kk/title_ky groups and
+   lays them out as 4 equal columns side by side.
+═══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.querySelector('form');
+  if (!form) return;
+
+  var SFXS  = ['_ru', '_kk', '_ky'];
+  var LANGS = { '': 'EN', '_ru': 'RU', '_kk': 'KZ', '_ky': 'KY' };
+
+  /* Build map: field name → .ah-field wrapper div */
+  var byName = {};
+  form.querySelectorAll('.ah-field[data-field]').forEach(function (w) {
+    byName[w.getAttribute('data-field')] = w;
+  });
+
+  var done = {};
+
+  Object.keys(byName).forEach(function (name) {
+    if (done[name]) return;
+
+    /* Skip fields that ARE a language variant */
+    if (SFXS.some(function (s) {
+      return name.length > s.length && name.slice(-s.length) === s;
+    })) return;
+
+    /* Find which variants exist in this form */
+    var varSfx = SFXS.filter(function (s) { return byName[name + s]; });
+    if (!varSfx.length) return;
+
+    /* Build Bootstrap row container */
+    var row = document.createElement('div');
+    row.className = 'row g-2 ah-lang-row';
+    byName[name].parentNode.insertBefore(row, byName[name]);
+
+    /* Move a field wrapper into a new column inside the row */
+    function addToRow(wrap, lang) {
+      var fieldName = wrap.getAttribute('data-field');
+      done[fieldName] = 1;
+
+      /* Strip existing "(EN)"/"(RU)"/"(KZ)"/"(KY)" from label text and add badge */
+      var lbl = wrap.querySelector('label');
+      if (lbl) {
+        var clean = lbl.textContent.replace(/\s*\((EN|RU|KZ|KY)\)\s*$/i, '').trim();
+        var badge = document.createElement('span');
+        badge.className = 'ah-lang-badge ms-1';
+        badge.textContent = lang;
+        lbl.textContent = clean;
+        lbl.appendChild(document.createTextNode(' '));
+        lbl.appendChild(badge);
+      }
+
+      wrap.classList.remove('mb-3');
+      wrap.style.marginBottom = '0';
+
+      var col = document.createElement('div');
+      col.className = 'col-sm-6 col-xl-3';
+      col.appendChild(wrap);
+      row.appendChild(col);
+    }
+
+    addToRow(byName[name], 'EN');
+    varSfx.forEach(function (sfx) {
+      addToRow(byName[name + sfx], LANGS[sfx]);
+    });
+  });
+});
+
+})();
+</script>
+{% endblock %}

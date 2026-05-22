@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.admin import create_admin
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -33,6 +34,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+# ── Admin panel ───────────────────────────────────────────────────────────────
+create_admin(app)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 origins = ["*"] if settings.CORS_ALLOW_ALL else settings.CORS_ORIGINS

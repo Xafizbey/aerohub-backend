@@ -1,0 +1,76 @@
+{% macro menu_category(menu, request) %}
+<li class="ah-nav-section">
+  <div class="ah-section-label">
+    {% if menu.icon %}<i class="{{ menu.icon }}"></i>{% endif %}
+    {{ menu.display_name }}
+  </div>
+  {% for sub_menu in menu.children %}
+  {% if sub_menu.is_visible(request) and sub_menu.is_accessible(request) %}
+  <a class="ah-nav-link {% if sub_menu.is_active(request) %}active{% endif %}" href="{{ sub_menu.url(request) }}">
+    <span class="ah-nav-icon">
+      {% if sub_menu.icon %}<i class="{{ sub_menu.icon }}"></i>{% endif %}
+    </span>
+    <span class="ah-nav-title">{{ sub_menu.display_name }}</span>
+    {% if sub_menu.is_active(request) %}<span class="ah-nav-pip"></span>{% endif %}
+  </a>
+  {% endif %}
+  {% endfor %}
+</li>
+{% endmacro %}
+
+{% macro menu_item(menu, request) %}
+{% if menu.is_visible(request) and menu.is_accessible(request) %}
+<li class="ah-nav-item">
+  <a class="ah-nav-link {% if menu.is_active(request) %}active{% endif %}" href="{{ menu.url(request) }}">
+    <span class="ah-nav-icon">
+      {% if menu.icon %}<i class="{{ menu.icon }}"></i>{% endif %}
+    </span>
+    <span class="ah-nav-title">{{ menu.display_name }}</span>
+    {% if menu.is_active(request) %}<span class="ah-nav-pip"></span>{% endif %}
+  </a>
+</li>
+{% endif %}
+{% endmacro %}
+
+{% macro display_menu(menu, request) %}
+<ul class="ah-nav-list">
+  {% for item in menu.items %}
+  {% if item.type_ == "View" %}
+  {{ menu_item(item, request) }}
+  {% elif item.type_ == "Category" %}
+  {{ menu_category(item, request) }}
+  {% endif %}
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{# ── Form macros ──────────────────────────────────────────────────────────── #}
+{% macro render_field(field, kwargs={}) %}
+<div class="mb-3 ah-field" data-field="{{ field.name }}">
+  {{ field.label(class_="form-label") }}
+  {% if field.errors %}
+  {{ field(class_="form-control is-invalid") }}
+  {% else %}
+  {{ field() }}
+  {% endif %}
+  {% for error in field.errors %}
+  <div class="invalid-feedback">{{ error }}</div>
+  {% endfor %}
+  {% if field.description %}
+  <small class="form-hint">{{ field.description }}</small>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_form_fields(form, form_opts=None) %}
+{% if form.hidden_tag is defined %}
+{{ form.hidden_tag() }}
+{% else %}
+{% for f in form if f.widget.input_type == 'hidden' %}
+{{ f }}
+{% endfor %}
+{% endif %}
+{% for f in form if f.widget.input_type != 'hidden' %}
+{{ render_field(f, kwargs) }}
+{% endfor %}
+{% endmacro %}

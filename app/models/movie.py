@@ -22,10 +22,19 @@ class MovieCategory(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name_ru: Mapped[str | None] = mapped_column(String(100))
+    name_kk: Mapped[str | None] = mapped_column(String(100))
+    name_ky: Mapped[str | None] = mapped_column(String(100))
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text)
+    description_ru: Mapped[str | None] = mapped_column(Text)
+    description_kk: Mapped[str | None] = mapped_column(Text)
+    description_ky: Mapped[str | None] = mapped_column(Text)
 
     movies: Mapped[list["Movie"]] = relationship(back_populates="category", lazy="select")
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Movie(Base):
@@ -37,9 +46,11 @@ class Movie(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     title_ru: Mapped[str | None] = mapped_column(String(255))
     title_kk: Mapped[str | None] = mapped_column(String(255))
+    title_ky: Mapped[str | None] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
     description_ru: Mapped[str | None] = mapped_column(Text)
     description_kk: Mapped[str | None] = mapped_column(Text)
+    description_ky: Mapped[str | None] = mapped_column(Text)
     year: Mapped[int | None] = mapped_column(Integer)
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
     rating: Mapped[float | None] = mapped_column(Float)
