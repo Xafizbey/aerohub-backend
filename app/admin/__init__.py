@@ -35,7 +35,7 @@ def create_admin(app: FastAPI) -> Admin:
         authentication_backend=auth_backend,
         title="AeroHub",
         base_url="/admin",
-        logo_url=None,
+        logo_url="/static/logo.png",
         favicon_url=None,
         templates_dir=_TEMPLATES_DIR,
     )
