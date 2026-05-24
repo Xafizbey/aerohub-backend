@@ -61,9 +61,6 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 # ── Static media (served locally — no CDN in airplane) ───────────────────────
 app.mount("/media", StaticFiles(directory=str(settings.MEDIA_ROOT)), name="media")
 
-# ── Static assets (admin logo etc.) ──────────────────────────────────────────
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 @app.get("/health", tags=["Health"])
 async def health():
