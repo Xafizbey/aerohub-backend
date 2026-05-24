@@ -69,6 +69,11 @@ class Movie(Base):
     view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_published: Mapped[bool] = mapped_column(default=True, nullable=False)
 
+    # Stub attributes for sqladmin FileField — prevents AttributeError in
+    # sqladmin 0.19 _handle_form_data when no file is uploaded on edit.
+    poster_upload = None
+    video_upload = None
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -76,7 +81,7 @@ class Movie(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    view_history: Mapped[list["ViewHistory"]] = relationship(back_populates="movie", lazy="select")
+    view_history: Mapped[list["ViewHistory"]] = relationship(back_populates="movie", lazy="select", passive_deletes=True)
 
     __table_args__ = (
         Index("ix_movies_title", "title"),

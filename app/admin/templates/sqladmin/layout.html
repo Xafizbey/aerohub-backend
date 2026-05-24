@@ -74,37 +74,27 @@
 
 /* ── Brand ────────────────────────────────────────────────── */
 .ah-brand {
-  display: flex; align-items: center; gap: .7rem;
-  padding: 1.2rem 1.1rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: .75rem 1rem .6rem;
   border-bottom: 1px solid;
   text-decoration: none !important;
-  flex-shrink: 0;
+  flex-shrink: 0; gap: .2rem;
 }
-[data-bs-theme="dark"]  .ah-brand { border-color: rgba(255,255,255,.07); background: #080f1e; }
-[data-bs-theme="light"] .ah-brand { border-color: rgba(0,0,0,.08);       background: #f8fafc; }
+[data-bs-theme="dark"]  .ah-brand { border-color: rgba(255,255,255,.07); }
+[data-bs-theme="light"] .ah-brand { border-color: rgba(0,0,0,.08);}
 
-.ah-brand-plane {
-  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-  background: linear-gradient(135deg, #1e3a8a, #2563eb);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
-  box-shadow: 0 0 14px rgba(59,130,246,.35);
+.ah-brand-logo {
+  height: 32px;
+  width: auto;
+  display: block;
+  object-fit: contain;
 }
 
-.ah-brand-name {
-  display: block; font-size: .98rem; font-weight: 700; letter-spacing: -.3px;
-  background: linear-gradient(135deg, #93c5fd, #67e8f9);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+.ah-brand-caption {
+  font-size: .58rem; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; color: #94a3b8;
   font-family: var(--ah-font);
 }
-
-.ah-brand-sub {
-  display: block; font-size: .63rem; font-weight: 600;
-  letter-spacing: .8px; text-transform: uppercase; margin-top: 1px;
-  font-family: var(--ah-font);
-}
-[data-bs-theme="dark"]  .ah-brand-sub { color: #2d4a78; }
-[data-bs-theme="light"] .ah-brand-sub { color: #94a3b8; }
 
 /* ── Nav scroll wrapper ───────────────────────────────────── */
 .ah-nav-scroll {
@@ -309,15 +299,7 @@
 
       {# Brand #}
       <a href="{{ url_for('admin:index') }}" class="ah-brand">
-        <div class="ah-brand-plane">✈</div>
-        {% if admin.logo_url %}
-        <img src="{{ admin.logo_url }}" height="36" alt="{{ admin.title }}">
-        {% else %}
-        <div>
-          <span class="ah-brand-name">{{ admin.title }}</span>
-          <span class="ah-brand-sub">Control Panel</span>
-        </div>
-        {% endif %}
+        <img src="/media/asman-cinema.png" alt="Asman Cinema" class="ah-brand-logo">
       </a>
 
       {# Navigation items #}
@@ -426,6 +408,14 @@ var T = {
   'View': 'Просмотр',
   'Play History': 'История прослушиваний',
   'Play': 'Прослушивание',
+  'Genre Stats': 'Статистика жанров',
+  'Genre Statistics': 'Статистика жанров',
+  'Views by Genre': 'Просмотры по жанрам',
+  'Detailed Breakdown': 'Подробная разбивка',
+  'Total Views': 'Всего просмотров',
+  'Movies Watched': 'Фильмов просмотрено',
+  'Completion Rate': 'Процент досмотра',
+  'Share of Total': 'Доля от общего',
   /* ── Sidebar categories ─────────────── */
   'Accounts': 'Аккаунты',
   'Content': 'Контент',

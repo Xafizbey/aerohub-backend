@@ -6,10 +6,15 @@ from sqladmin import Admin
 from app.admin.auth import AdminAuth
 from app.admin.views import (
     BannerAdmin,
+    CafeCategoryAdmin,
+    CafeItemAdmin,
+    CafeOrderAdmin,
     FlightInfoAdmin,
+    GenreStatsView,
     MovieAdmin,
     MovieCategoryAdmin,
     MusicAdmin,
+    MusicCategoryAdmin,
     PlayHistoryAdmin,
     PlaylistAdmin,
     UserAdmin,
@@ -43,6 +48,7 @@ def create_admin(app: FastAPI) -> Admin:
     admin.add_view(MovieAdmin)
 
     # Music
+    admin.add_view(MusicCategoryAdmin)
     admin.add_view(MusicAdmin)
     admin.add_view(PlaylistAdmin)
 
@@ -50,7 +56,13 @@ def create_admin(app: FastAPI) -> Admin:
     admin.add_view(BannerAdmin)
     admin.add_view(FlightInfoAdmin)
 
+    # Air Cafe
+    admin.add_view(CafeCategoryAdmin)
+    admin.add_view(CafeItemAdmin)
+    admin.add_view(CafeOrderAdmin)
+
     # Analytics (read-only)
+    admin.add_base_view(GenreStatsView)
     admin.add_view(ViewHistoryAdmin)
     admin.add_view(PlayHistoryAdmin)
 

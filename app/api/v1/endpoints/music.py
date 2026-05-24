@@ -7,17 +7,99 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.common import MessageResponse, PaginatedResponse
 from app.schemas.music import (
+    MusicCategoryCreate, MusicCategoryOut,
     MusicCreate, MusicOut, MusicUpdate,
+    PlayRecordCreate,
     PlaylistCreate, PlaylistOut, PlaylistTrackAdd, PlaylistUpdate,
 )
-from app.services.auth import get_current_user, require_admin
+from app.services.auth import require_admin
 from app.services import music as music_svc
 from app.services.media import upload_audio, upload_poster
 
 router = APIRouter(prefix="/music", tags=["Music"])
 
 
-# ── Music (public) ────────────────────────────────────────────────────────────
+# ── Categories (public) ───────────────────────────────────────────────────────
+
+@router.get("/categories", response_model=list[MusicCategoryOut])
+async def list_music_categories(db: AsyncSession = Depends(get_db)):
+    return await music_svc.list_categories(db)
+
+
+@router.post("/categories", response_model=MusicCategoryOut, status_code=201)
+async def create_music_category(
+    data: MusicCategoryCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await music_svc.create_category(data, db)
+
+
+# ── Playlists (public read, admin write) ──────────────────────────────────────
+
+@router.get("/playlists", response_model=list[PlaylistOut])
+async def list_playlists(db: AsyncSession = Depends(get_db)):
+    return await music_svc.list_playlists(db)
+
+
+@router.post("/playlists", response_model=PlaylistOut, status_code=201)
+async def create_playlist(
+    data: PlaylistCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await music_svc.create_playlist(data, db)
+
+
+@router.get("/playlists/{playlist_id}", response_model=PlaylistOut)
+async def get_playlist(
+    playlist_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    return await music_svc.get_playlist(playlist_id, db)
+
+
+@router.patch("/playlists/{playlist_id}", response_model=PlaylistOut)
+async def update_playlist(
+    playlist_id: uuid.UUID,
+    data: PlaylistUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await music_svc.update_playlist(playlist_id, data, db)
+
+
+@router.delete("/playlists/{playlist_id}", response_model=MessageResponse)
+async def delete_playlist(
+    playlist_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    await music_svc.delete_playlist(playlist_id, db)
+    return MessageResponse(message="Playlist deleted")
+
+
+@router.post("/playlists/{playlist_id}/tracks", response_model=PlaylistOut)
+async def add_track(
+    playlist_id: uuid.UUID,
+    data: PlaylistTrackAdd,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await music_svc.add_track_to_playlist(playlist_id, data, db)
+
+
+@router.delete("/playlists/{playlist_id}/tracks/{track_id}", response_model=PlaylistOut)
+async def remove_track(
+    playlist_id: uuid.UUID,
+    track_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await music_svc.remove_track_from_playlist(playlist_id, track_id, db)
+
+
+# ── Music tracks (public) ─────────────────────────────────────────────────────
 
 @router.get("", response_model=PaginatedResponse)
 async def list_music(
@@ -27,11 +109,13 @@ async def list_music(
     genre: str | None = Query(None),
     artist: str | None = Query(None),
     language: str | None = Query(None),
+    category_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     result = await music_svc.list_music(
         db, page=page, page_size=page_size,
         search=search, genre=genre, artist=artist, language=language,
+        category_id=category_id,
     )
     result.items = [MusicOut.model_validate(m) for m in result.items]
     return result
@@ -45,7 +129,7 @@ async def get_music(
     return await music_svc.get_music(music_id, db)
 
 
-# ── Music CRUD (crew only) ────────────────────────────────────────────────────
+# ── Music CRUD (admin only) ───────────────────────────────────────────────────
 
 @router.post("", response_model=MusicOut, status_code=201)
 async def create_music(
@@ -76,6 +160,15 @@ async def delete_music(
     return MessageResponse(message="Music deleted")
 
 
+@router.post("/{music_id}/play", status_code=204)
+async def record_play(
+    music_id: uuid.UUID,
+    data: PlayRecordCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    await music_svc.record_play(music_id, data.played_seconds, data.completed, db)
+
+
 @router.post("/{music_id}/cover", response_model=MusicOut)
 async def upload_cover(
     music_id: uuid.UUID,
@@ -86,7 +179,7 @@ async def upload_cover(
     music = await music_svc.get_music(music_id, db)
     music.cover_path = await upload_poster(file)
     await db.flush()
-    await db.refresh(music)
+    await db.refresh(music, ["category"])
     return music
 
 
@@ -100,73 +193,5 @@ async def upload_audio_file(
     music = await music_svc.get_music(music_id, db)
     music.audio_path = await upload_audio(file)
     await db.flush()
-    await db.refresh(music)
+    await db.refresh(music, ["category"])
     return music
-
-
-# ── Playlists (crew only — requires login) ────────────────────────────────────
-
-@router.get("/playlists/me", response_model=list[PlaylistOut])
-async def my_playlists(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.list_playlists(current_user.id, db)
-
-
-@router.post("/playlists", response_model=PlaylistOut, status_code=201)
-async def create_playlist(
-    data: PlaylistCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.create_playlist(data, current_user.id, db)
-
-
-@router.get("/playlists/{playlist_id}", response_model=PlaylistOut)
-async def get_playlist(
-    playlist_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.get_playlist(playlist_id, current_user.id, db)
-
-
-@router.patch("/playlists/{playlist_id}", response_model=PlaylistOut)
-async def update_playlist(
-    playlist_id: uuid.UUID,
-    data: PlaylistUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.update_playlist(playlist_id, data, current_user.id, db)
-
-
-@router.delete("/playlists/{playlist_id}", response_model=MessageResponse)
-async def delete_playlist(
-    playlist_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    await music_svc.delete_playlist(playlist_id, current_user.id, db)
-    return MessageResponse(message="Playlist deleted")
-
-
-@router.post("/playlists/{playlist_id}/tracks", response_model=PlaylistOut)
-async def add_track(
-    playlist_id: uuid.UUID,
-    data: PlaylistTrackAdd,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.add_track_to_playlist(playlist_id, data, current_user.id, db)
-
-
-@router.delete("/playlists/{playlist_id}/tracks/{track_id}", response_model=PlaylistOut)
-async def remove_track(
-    playlist_id: uuid.UUID,
-    track_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return await music_svc.remove_track_from_playlist(playlist_id, track_id, current_user.id, db)

@@ -1,0 +1,203 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content_header %}
+<div class="row align-items-center">
+  <div class="col">
+    <h2 class="page-title">Genre Statistics</h2>
+    <div class="page-pretitle">Movie views by genre &middot; Analytics</div>
+  </div>
+  <div class="col-auto ms-auto d-print-none">
+    <div class="d-flex gap-2 align-items-center">
+      {% if total_views %}
+      <span style="font-size:.82rem; font-weight:600; font-family:monospace; padding:.35em .85em; border-radius:6px; background:rgba(59,130,246,.12); color:#3b82f6; border:1px solid rgba(59,130,246,.22);">
+        <i class="fa-solid fa-eye me-1"></i>{{ total_views }} total views
+      </span>
+      {% endif %}
+      <span style="font-size:.82rem; font-weight:600; font-family:monospace; padding:.35em .85em; border-radius:6px; background:rgba(6,182,212,.1); color:#06b6d4; border:1px solid rgba(6,182,212,.2);">
+        <i class="fa-solid fa-tags me-1"></i>{{ stats | length }} genres
+      </span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Bar chart ───────────────────────────────────────────── #}
+<div class="col-12">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-chart-bar me-2" style="color:#3b82f6;"></i>
+        Views by Genre
+      </h3>
+    </div>
+    <div class="card-body">
+      <style>
+        .gs-bar-wrap {
+          display: grid;
+          grid-template-columns: minmax(110px, 180px) 1fr auto;
+          align-items: center;
+          gap: 14px;
+          padding: 4px 0;
+        }
+        .gs-bar-label {
+          font-size: .84rem;
+          font-weight: 600;
+          text-align: right;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .gs-bar-track {
+          height: 30px;
+          border-radius: 7px;
+          overflow: hidden;
+          position: relative;
+        }
+        [data-bs-theme="dark"] .gs-bar-track  { background: rgba(255,255,255,.06); }
+        [data-bs-theme="light"] .gs-bar-track { background: rgba(0,0,0,.07); }
+        .gs-bar-fill {
+          height: 100%;
+          border-radius: 7px;
+          display: flex;
+          align-items: center;
+          padding-left: 12px;
+          min-width: 6px;
+          transition: width .6s cubic-bezier(.4,0,.2,1);
+        }
+        .gs-bar-inner-label {
+          font-size: .73rem;
+          font-weight: 600;
+          color: rgba(255,255,255,.9);
+          font-family: monospace;
+          letter-spacing: .04em;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .gs-bar-count {
+          font-size: .9rem;
+          font-weight: 700;
+          font-family: monospace;
+          min-width: 52px;
+          text-align: right;
+        }
+        [data-bs-theme="dark"]  .gs-bar-count { color: #60a5fa; }
+        [data-bs-theme="light"] .gs-bar-count { color: #2563eb; }
+
+        /* divider between rows */
+        .gs-bar-row + .gs-bar-row { border-top: 1px solid; }
+        [data-bs-theme="dark"]  .gs-bar-row + .gs-bar-row { border-color: rgba(255,255,255,.04); }
+        [data-bs-theme="light"] .gs-bar-row + .gs-bar-row { border-color: rgba(0,0,0,.06); }
+        .gs-bar-row { padding: 6px 0; }
+      </style>
+
+      {% if stats %}
+        {% set max_views = stats[0].total_views %}
+        {# Gradient palette cycling through 6 colors #}
+        {% set palettes = [
+          'linear-gradient(90deg,#1e3a8a,#3b82f6,#06b6d4)',
+          'linear-gradient(90deg,#065f46,#10b981,#34d399)',
+          'linear-gradient(90deg,#4c1d95,#7c3aed,#a78bfa)',
+          'linear-gradient(90deg,#7c2d12,#ea580c,#fb923c)',
+          'linear-gradient(90deg,#831843,#db2777,#f472b6)',
+          'linear-gradient(90deg,#164e63,#0e7490,#22d3ee)',
+        ] %}
+
+        <div>
+          {% for s in stats %}
+          {% set pct = (s.total_views / max_views * 100) | round(1) %}
+          {% set color = palettes[loop.index0 % 6] %}
+          <div class="gs-bar-row">
+            <div class="gs-bar-wrap">
+              <div class="gs-bar-label" title="{{ s.genre_name }}">{{ s.genre_name }}</div>
+              <div class="gs-bar-track">
+                <div class="gs-bar-fill" style="width:{{ pct }}%; background:{{ color }};">
+                  {% if pct >= 18 %}
+                  <span class="gs-bar-inner-label">
+                    {{ s.total_views }} views &middot; {{ (s.completion_rate * 100) | round(0) | int }}% finished
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="gs-bar-count">{{ s.total_views }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+      {% else %}
+        <div style="text-align:center; padding:3rem 1rem; opacity:.5;">
+          <i class="fa-solid fa-film" style="font-size:2.2rem; display:block; margin-bottom:.75rem;"></i>
+          <div style="font-size:.9rem;">No view data yet. Views are recorded when passengers watch movies.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Detailed table ──────────────────────────────────────── #}
+{% if stats %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-table me-2" style="color:#06b6d4;"></i>
+        Detailed Breakdown
+      </h3>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover table-vcenter card-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Genre</th>
+            <th>Total Views</th>
+            <th>Movies Watched</th>
+            <th>Completion Rate</th>
+            <th>Share of Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in stats %}
+          <tr>
+            <td>
+              <span style="font-family:monospace; font-size:.8rem; opacity:.5;">{{ loop.index }}</span>
+            </td>
+            <td>
+              <strong>{{ s.genre_name }}</strong>
+            </td>
+            <td>
+              <span style="font-family:monospace; font-weight:700;">{{ s.total_views }}</span>
+            </td>
+            <td>
+              <span style="font-family:monospace;">{{ s.unique_movies }}</span>
+            </td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:72px; height:5px; border-radius:4px; overflow:hidden; background:rgba(128,128,128,.15);">
+                  <div style="height:100%; width:{{ (s.completion_rate * 100) | round(0) | int }}%; background:linear-gradient(90deg,#065f46,#10b981); border-radius:4px;"></div>
+                </div>
+                <span style="font-family:monospace; font-size:.8rem;">{{ (s.completion_rate * 100) | round(1) }}%</span>
+              </div>
+            </td>
+            <td>
+              {% if total_views > 0 %}
+              <span style="font-family:monospace; font-size:.82rem; opacity:.7;">
+                {{ (s.total_views / total_views * 100) | round(1) }}%
+              </span>
+              {% else %}
+              <span style="opacity:.35;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -38,7 +38,6 @@ class User(Base):
 
     view_history: Mapped[list["ViewHistory"]] = relationship(back_populates="user", lazy="select")
     play_history: Mapped[list["PlayHistory"]] = relationship(back_populates="user", lazy="select")
-    playlists: Mapped[list["Playlist"]] = relationship(back_populates="owner", lazy="select")
 
     __table_args__ = (
         Index("ix_users_role", "role"),

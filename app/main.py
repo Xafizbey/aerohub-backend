@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
     (settings.MEDIA_ROOT / "posters").mkdir(exist_ok=True)
     (settings.MEDIA_ROOT / "videos").mkdir(exist_ok=True)
     (settings.MEDIA_ROOT / "music").mkdir(exist_ok=True)
+    (settings.MEDIA_ROOT / "cafe").mkdir(exist_ok=True)
     yield
 
 

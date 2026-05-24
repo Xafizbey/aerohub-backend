@@ -6,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.analytics import (
-    MovieStats, MusicStats, PlayHistoryOut, TrackPlay, TrackView, ViewHistoryOut,
+    GenreStats, MovieStats, MusicStats, PlayHistoryOut, TrackPlay, TrackView, ViewHistoryOut,
 )
 from app.services.analytics import (
-    get_movie_stats, get_music_stats, track_movie_view, track_music_play,
+    get_genre_stats, get_movie_stats, get_music_stats, track_movie_view, track_music_play,
 )
 from app.services.auth import require_admin
 
@@ -52,3 +52,12 @@ async def top_music(
     _: User = Depends(require_admin),
 ):
     return await get_music_stats(db, limit=limit)
+
+
+@router.get("/genres/top", response_model=list[GenreStats])
+async def top_genres(
+    limit: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return await get_genre_stats(db, limit=limit)

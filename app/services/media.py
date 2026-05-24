@@ -87,6 +87,27 @@ async def upload_video(file: UploadFile) -> str:
     return relative
 
 
+async def upload_cafe_image(file: UploadFile) -> str:
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="Only JPEG/PNG/WebP images are accepted")
+
+    content = await file.read()
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit",
+        )
+
+    suffix = Path(file.filename or "file").suffix or ".jpg"
+    filename = f"{uuid.uuid4()}{suffix}"
+    path = _save_path("cafe", filename)
+    path.write_bytes(content)
+
+    relative = f"media/cafe/{filename}"
+    logger.info("Cafe image saved: %s", relative)
+    return relative
+
+
 def register_hls_path(hls_path: str) -> str:
     """Validate and normalise an HLS path supplied by admin."""
     p = Path(hls_path)

@@ -53,3 +53,11 @@ class MusicStats(BaseModel):
     total_plays: int
     unique_listeners: int
     completion_rate: float
+
+
+class GenreStats(BaseModel):
+    genre_id: int
+    genre_name: str
+    total_views: int
+    unique_movies: int
+    completion_rate: float
