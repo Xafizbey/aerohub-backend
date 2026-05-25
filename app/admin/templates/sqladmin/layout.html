@@ -420,6 +420,14 @@ var T = {
   'Accounts': 'Аккаунты',
   'Content': 'Контент',
   'Analytics': 'Аналитика',
+  'Air Cafe': 'Бортовое кафе',
+  /* ── Air Cafe model names ────────────── */
+  'Cafe Categories': 'Категории кафе',
+  'Menu Item': 'Позиция меню',
+  'Menu Items': 'Позиции меню',
+  'Cafe Order': 'Заказ',
+  'Cafe Orders': 'Заказы кафе',
+  '+ Добавить Menu Item': '+ Добавить в меню',
   /* ── Sidebar controls ───────────────── */
   'Light mode': 'Светлая тема',
   'Dark mode': 'Тёмная тема',
@@ -500,6 +508,21 @@ var T = {
   'Played (s)': 'Прослушано (с)',
   'Played At': 'Прослушано в',
   'Slug': 'Слаг',
+  /* ── Air Cafe column labels ──────────── */
+  'Stock': 'Остаток',
+  'Icon (emoji)': 'Иконка (emoji)',
+  'Price ($)': 'Цена ($)',
+  'Ingredients': 'Состав',
+  'Available': 'В наличии',
+  'Featured': 'Рекомендуемое',
+  'Chef Special': 'От шеф-повара',
+  'Duty Free': 'Беспошлинный',
+  'Orders': 'Заказов',
+  'Likes': 'Лайков',
+  'Total ($)': 'Сумма ($)',
+  'Ordered At': 'Дата заказа',
+  'Status': 'Статус',
+  'Notes': 'Примечания',
   /* ── Page titles ────────────────────── */
   'List': 'Список',
   'Detail': 'Детали',
@@ -557,13 +580,25 @@ function walkAndTranslate(root, dict) {
 /* ═══════════════════════════════════════════
    5. LANGUAGE toggle
 ═══════════════════════════════════════════ */
+
+/* Update dynamic DB values rendered with data-en / data-ru attributes */
+function updateLangVals(lang) {
+  document.querySelectorAll('.ah-lang-val').forEach(function(el) {
+    var val = el.getAttribute('data-' + lang);
+    if (val !== null) el.textContent = val;
+  });
+}
+
 function setLang(lang) {
   localStorage.setItem('ah-lang', lang);
 
   /* Apply the right dictionary:
      switching TO Russian  → use T     (EN → RU)
-     switching TO English  → use T_rev (RU → EN)  ← this was missing before */
+     switching TO English  → use T_rev (RU → EN) */
   walkAndTranslate(document.body, lang === 'ru' ? T : T_rev);
+
+  /* Switch dynamic DB values (category names etc.) */
+  updateLangVals(lang);
 
   /* Mark active button */
   document.querySelectorAll('.ah-lang-btn').forEach(function(b) {
@@ -593,6 +628,7 @@ document.querySelectorAll('.ah-lang-btn').forEach(function(b) {
 /* Page is always served in English — translate once on load if RU is active */
 if (savedLang === 'ru') {
   walkAndTranslate(document.body, T);
+  updateLangVals('ru');
 }
 
 /* ═══════════════════════════════════════════

@@ -6,7 +6,7 @@ from sqlalchemy import (
     DateTime, Float, ForeignKey, Index, Integer, String, Text, func, Enum,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base
 
@@ -62,6 +62,8 @@ class CafeItem(Base):
     # Duty-free flag
     is_duty_free: Mapped[bool] = mapped_column(default=False, nullable=False)
 
+    stock: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+
     order_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     like_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -84,6 +86,14 @@ class CafeItem(Base):
         Index("ix_cafe_items_is_featured", "is_featured"),
         Index("ix_cafe_items_is_published", "is_published"),
     )
+
+    @validates("stock")
+    def _sync_availability(self, key: str, value: int | None) -> int | None:
+        # Only auto-enable when stock is positive; disabling on zero is
+        # handled by on_model_change (admin) or explicitly in create_order.
+        if value is not None and value > 0:
+            self.is_available = True
+        return value
 
     def __str__(self) -> str:
         return self.name

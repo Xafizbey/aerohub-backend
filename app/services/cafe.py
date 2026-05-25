@@ -120,6 +120,10 @@ async def create_order(data: OrderCreate, db: AsyncSession) -> CafeOrder:
             unit_price=db_item.price,
         ))
         db_item.order_count += line.quantity
+        if db_item.stock is not None:
+            db_item.stock = max(0, db_item.stock - line.quantity)
+            if db_item.stock == 0:
+                db_item.is_available = False
 
     await db.flush()
     await db.refresh(order, ["items"])

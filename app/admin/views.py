@@ -1,6 +1,8 @@
 import uuid
 from typing import Any, Dict, FrozenSet
 
+from markupsafe import Markup
+
 from sqladmin import BaseView, ModelView, expose
 from sqlalchemy import delete, select
 from starlette.requests import Request
@@ -493,7 +495,7 @@ class CafeItemAdmin(ModelView, model=CafeItem):
 
     column_list = [
         CafeItem.name, CafeItem.category, CafeItem.price,
-        CafeItem.is_available, CafeItem.is_featured, CafeItem.is_chef_special,
+        CafeItem.stock, CafeItem.is_available, CafeItem.is_featured, CafeItem.is_chef_special,
         CafeItem.order_count, CafeItem.created_at,
     ]
     column_searchable_list = [CafeItem.name, CafeItem.name_ru, CafeItem.ingredients]
@@ -501,13 +503,28 @@ class CafeItemAdmin(ModelView, model=CafeItem):
     column_sortable_list = [CafeItem.name, CafeItem.price, CafeItem.is_available, CafeItem.order_count, CafeItem.created_at]
     column_default_sort = [(CafeItem.created_at, True)]
 
+    column_formatters = {
+        "name": lambda m, a: Markup(
+            '<span class="ah-lang-val" data-en="{en}" data-ru="{ru}">{en}</span>'.format(
+                en=m.name or "",
+                ru=m.name_ru or m.name or "",
+            )
+        ),
+        "category": lambda m, a: Markup(
+            '<span class="ah-lang-val" data-en="{en}" data-ru="{ru}">{en}</span>'.format(
+                en=m.category.name if m.category else "",
+                ru=(m.category.name_ru or m.category.name) if m.category else "",
+            )
+        ) if m.category else "",
+    }
+
     column_labels = {
         "name": "Name (EN)", "name_ru": "Name (RU)", "name_kk": "Name (KZ)", "name_ky": "Name (KY)",
         "description": "Description (EN)", "description_ru": "Description (RU)",
         "description_kk": "Description (KZ)", "description_ky": "Description (KY)",
         "ingredients": "Ingredients", "price": "Price ($)",
         "image_path": "Image Path", "category": "Category",
-        "is_available": "Available", "is_featured": "Featured",
+        "stock": "Stock", "is_available": "Available", "is_featured": "Featured",
         "is_chef_special": "Chef Special", "is_duty_free": "Duty Free",
         "is_published": "Published", "order_count": "Orders", "like_count": "Likes",
         "created_at": "Created", "updated_at": "Updated",
@@ -541,9 +558,18 @@ class CafeItemAdmin(ModelView, model=CafeItem):
         if image_file and getattr(image_file, "filename", None):
             model.image_path = await upload_cafe_image(image_file)
 
+        # Sync availability from stock — runs after all form fields are applied.
+        # stock > 0  → always available (ignore form's is_available value)
+        # stock = 0  → unavailable by default, but admin can override by checking В наличии
+        # stock None → manual control via is_available field
+        if model.stock is not None and model.stock > 0:
+            model.is_available = True
+        elif model.stock == 0 and not model.is_available:
+            model.is_available = False
+
 
 class CafeOrderAdmin(ModelView, model=CafeOrder):
-    name = "Order"
+    name = "Cafe Order"
     name_plural = "Cafe Orders"
     icon = "fa-solid fa-receipt"
     category = "Air Cafe"
