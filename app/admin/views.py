@@ -5,6 +5,7 @@ from sqladmin import BaseView, ModelView, expose
 from sqlalchemy import delete, select
 from starlette.requests import Request
 from wtforms import FileField, SelectField
+from wtforms.validators import Optional
 
 from app.db.session import AsyncSessionLocal
 from app.models.analytics import PlayHistory, ViewHistory
@@ -234,7 +235,12 @@ class MusicAdmin(ModelView, model=Music):
             playlists = result.scalars().all()
 
         choices = [("", "— No playlist —")] + [(str(p.id), p.name) for p in playlists]
-        form_class.playlist_id = SelectField("Playlist", choices=choices, default="")
+        form_class.playlist_id = SelectField(
+            "Playlist (optional)",
+            choices=choices,
+            default="",
+            validators=[Optional()],
+        )
         return form_class
 
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
@@ -247,16 +253,17 @@ class MusicAdmin(ModelView, model=Music):
             model.audio_path = await upload_audio(audio_file)
 
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        playlist_id_str = data.get("playlist_id", "")
+        playlist_id_str = data.get("playlist_id") or ""
+        if not playlist_id_str:
+            return
         async with AsyncSessionLocal() as session:
             await session.execute(delete(PlaylistTrack).where(PlaylistTrack.music_id == model.id))
-            if playlist_id_str:
-                track = PlaylistTrack(
-                    playlist_id=uuid.UUID(playlist_id_str),
-                    music_id=model.id,
-                    position=0,
-                )
-                session.add(track)
+            track = PlaylistTrack(
+                playlist_id=uuid.UUID(playlist_id_str),
+                music_id=model.id,
+                position=0,
+            )
+            session.add(track)
             await session.commit()
 
 

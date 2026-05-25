@@ -38,7 +38,7 @@ async def create_music(data: MusicCreate, db: AsyncSession) -> Music:
     music = Music(**music_data)
     db.add(music)
     await db.flush()
-    if playlist_id:
+    if playlist_id is not None:
         await _set_music_playlist(music.id, playlist_id, db)
     await db.refresh(music, ["category"])
     return music
