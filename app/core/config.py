@@ -1,9 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Union
+from typing import List, Tuple, Type, Union
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,12 +14,31 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        **kwargs,
+    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        class SafeDotEnvSettings:
+            def __call__(self) -> dict:
+                try:
+                    return dotenv_settings()
+                except OSError:
+                    return {}
+
+        return (init_settings, env_settings, SafeDotEnvSettings())
+
     # App
     APP_NAME: str = "AeroHub"
     APP_VERSION: str = "1.0.0"
     APP_ENV: str = "development"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
+    ROOT_PATH: str = ""  # Set to "/cinema" in production via env var
 
     # Security
     SECRET_KEY: str
