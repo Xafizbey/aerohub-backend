@@ -1,10 +1,17 @@
 import uuid
-from typing import Any
+from typing import Any, Dict, FrozenSet
 
 from sqladmin import BaseView, ModelView, expose
 from sqlalchemy import delete, select
 from starlette.requests import Request
 from wtforms import FileField, SelectField
+
+
+def _strip_extra(data: dict, extra_fields: FrozenSet[str]) -> tuple[dict, dict]:
+    """Split form data into sqladmin-safe data and custom extra fields."""
+    extra = {k: data[k] for k in extra_fields if k in data}
+    clean = {k: v for k, v in data.items() if k not in extra_fields}
+    return clean, extra
 
 from app.db.session import AsyncSessionLocal
 from app.models.analytics import PlayHistory, ViewHistory
@@ -134,18 +141,31 @@ class MovieAdmin(ModelView, model=Movie):
     page_size = 25
     page_size_options = [10, 25, 50, 100]
 
+    _EXTRA: FrozenSet[str] = frozenset({"poster_upload", "video_upload"})
+
     async def scaffold_form(self) -> type:
         form_class = await super().scaffold_form()
         form_class.poster_upload = FileField("Poster Image (JPEG/PNG/WebP)")
         form_class.video_upload = FileField("Video File (MP4/MKV/MOV — leave empty to keep current)")
         return form_class
 
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        poster_file = data.get("poster_upload")
+        extra = getattr(request.state, "sqladmin_extra", {})
+        poster_file = extra.get("poster_upload")
         if poster_file and getattr(poster_file, "filename", None):
             model.poster_path = await upload_poster(poster_file)
 
-        video_file = data.get("video_upload")
+        video_file = extra.get("video_upload")
         if video_file and getattr(video_file, "filename", None):
             model.video_path = await upload_video(video_file)
 
@@ -224,6 +244,8 @@ class MusicAdmin(ModelView, model=Music):
     page_size = 25
     page_size_options = [10, 25, 50, 100]
 
+    _EXTRA: FrozenSet[str] = frozenset({"cover_upload", "audio_upload", "playlist_select"})
+
     async def scaffold_form(self) -> type:
         form_class = await super().scaffold_form()
         form_class.cover_upload = FileField("Cover Image (JPEG/PNG/WebP)")
@@ -241,17 +263,29 @@ class MusicAdmin(ModelView, model=Music):
         )
         return form_class
 
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        cover_file = data.get("cover_upload")
+        extra = getattr(request.state, "sqladmin_extra", {})
+        cover_file = extra.get("cover_upload")
         if cover_file and getattr(cover_file, "filename", None):
             model.cover_path = await upload_poster(cover_file)
 
-        audio_file = data.get("audio_upload")
+        audio_file = extra.get("audio_upload")
         if audio_file and getattr(audio_file, "filename", None):
             model.audio_path = await upload_audio(audio_file)
 
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        playlist_id_str = data.get("playlist_select") or ""
+        extra = getattr(request.state, "sqladmin_extra", {})
+        playlist_id_str = extra.get("playlist_select") or ""
         if not playlist_id_str:
             return
         async with AsyncSessionLocal() as session:
@@ -292,13 +326,26 @@ class PlaylistAdmin(ModelView, model=Playlist):
     form_excluded_columns = [Playlist.tracks, Playlist.banner_path, Playlist.created_at]
     page_size = 25
 
+    _EXTRA: FrozenSet[str] = frozenset({"banner_upload"})
+
     async def scaffold_form(self) -> type:
         form_class = await super().scaffold_form()
         form_class.banner_upload = FileField("Banner Image (JPEG/PNG/WebP)")
         return form_class
 
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        banner_file = data.get("banner_upload")
+        extra = getattr(request.state, "sqladmin_extra", {})
+        banner_file = extra.get("banner_upload")
         if banner_file and getattr(banner_file, "filename", None):
             model.banner_path = await upload_poster(banner_file)
 
@@ -414,14 +461,26 @@ class CafeCategoryAdmin(ModelView, model=CafeCategory):
 
     form_excluded_columns = [CafeCategory.items, CafeCategory.image_path]
     page_size = 25
+    _EXTRA: FrozenSet[str] = frozenset({"image_upload"})
 
     async def scaffold_form(self) -> type:
         form_class = await super().scaffold_form()
         form_class.image_upload = FileField("Category Image (JPEG/PNG/WebP)")
         return form_class
 
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        image_file = data.get("image_upload")
+        extra = getattr(request.state, "sqladmin_extra", {})
+        image_file = extra.get("image_upload")
         if image_file and getattr(image_file, "filename", None):
             model.image_path = await upload_cafe_image(image_file)
 
@@ -459,14 +518,26 @@ class CafeItemAdmin(ModelView, model=CafeItem):
         CafeItem.order_items, CafeItem.created_at, CafeItem.updated_at,
     ]
     page_size = 25
+    _EXTRA: FrozenSet[str] = frozenset({"image_upload"})
 
     async def scaffold_form(self) -> type:
         form_class = await super().scaffold_form()
         form_class.image_upload = FileField("Item Image (JPEG/PNG/WebP)")
         return form_class
 
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
     async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        image_file = data.get("image_upload")
+        extra = getattr(request.state, "sqladmin_extra", {})
+        image_file = extra.get("image_upload")
         if image_file and getattr(image_file, "filename", None):
             model.image_path = await upload_cafe_image(image_file)
 
