@@ -11,8 +11,7 @@ logs/
 # media/videos/*
 # media/music/*
 !media/.gitkeep
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+!alembic/versions/*.py
 dist/
 *.egg-info/
 .pytest_cache/
