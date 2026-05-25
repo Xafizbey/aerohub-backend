@@ -5,7 +5,6 @@ from sqladmin import BaseView, ModelView, expose
 from sqlalchemy import delete, select
 from starlette.requests import Request
 from wtforms import FileField, SelectField
-from wtforms.validators import Optional
 
 from app.db.session import AsyncSessionLocal
 from app.models.analytics import PlayHistory, ViewHistory
@@ -239,7 +238,6 @@ class MusicAdmin(ModelView, model=Music):
             "Playlist (optional)",
             choices=choices,
             default="",
-            validators=[Optional()],
         )
         return form_class
 
