@@ -234,7 +234,7 @@ class MusicAdmin(ModelView, model=Music):
             playlists = result.scalars().all()
 
         choices = [("", "— No playlist —")] + [(str(p.id), p.name) for p in playlists]
-        form_class.playlist_id = SelectField(
+        form_class.playlist_select = SelectField(
             "Playlist (optional)",
             choices=choices,
             default="",
@@ -251,7 +251,7 @@ class MusicAdmin(ModelView, model=Music):
             model.audio_path = await upload_audio(audio_file)
 
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
-        playlist_id_str = data.get("playlist_id") or ""
+        playlist_id_str = data.get("playlist_select") or ""
         if not playlist_id_str:
             return
         async with AsyncSessionLocal() as session:
