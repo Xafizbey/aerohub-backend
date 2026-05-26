@@ -108,6 +108,33 @@ async def upload_cafe_image(file: UploadFile) -> str:
     return relative
 
 
+ALLOWED_LOGO_TYPES = {"image/jpeg", "image/png", "image/webp", "image/svg+xml"}
+
+
+async def upload_company_logo(file: UploadFile) -> str:
+    if file.content_type not in ALLOWED_LOGO_TYPES:
+        raise HTTPException(status_code=415, detail="Only JPEG/PNG/WebP/SVG images are accepted")
+
+    content = await file.read()
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit",
+        )
+
+    suffix = Path(file.filename or "logo").suffix or ".png"
+    dest = settings.MEDIA_ROOT / "logos"
+    dest.mkdir(parents=True, exist_ok=True)
+    # Always write to the same filename so the URL stays stable
+    filename = f"logo{suffix}"
+    path = dest / filename
+    path.write_bytes(content)
+
+    relative = f"media/logos/{filename}"
+    logger.info("Company logo saved: %s", relative)
+    return relative
+
+
 def register_hls_path(hls_path: str) -> str:
     """Validate and normalise an HLS path supplied by admin."""
     p = Path(hls_path)

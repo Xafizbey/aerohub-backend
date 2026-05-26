@@ -20,6 +20,13 @@ async def lifespan(app: FastAPI):
     (settings.MEDIA_ROOT / "videos").mkdir(exist_ok=True)
     (settings.MEDIA_ROOT / "music").mkdir(exist_ok=True)
     (settings.MEDIA_ROOT / "cafe").mkdir(exist_ok=True)
+    (settings.MEDIA_ROOT / "logos").mkdir(exist_ok=True)
+    # Ensure the singleton company settings row exists
+    from app.db.session import AsyncSessionLocal
+    from app.services.company import get_or_create_settings
+    async with AsyncSessionLocal() as session:
+        await get_or_create_settings(session)
+        await session.commit()
     yield
 
 

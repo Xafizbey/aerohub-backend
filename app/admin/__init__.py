@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from sqladmin import Admin
+from sqlalchemy import select
 
 from app.admin.auth import AdminAuth
 from app.admin.views import (
@@ -9,6 +10,7 @@ from app.admin.views import (
     CafeCategoryAdmin,
     CafeItemAdmin,
     CafeOrderAdmin,
+    CompanySettingsAdmin,
     FlightInfoAdmin,
     GenreStatsView,
     MovieAdmin,
@@ -21,9 +23,27 @@ from app.admin.views import (
     ViewHistoryAdmin,
 )
 from app.core.config import settings
-from app.db.session import engine
+from app.db.session import engine, AsyncSessionLocal
 
 _TEMPLATES_DIR = str(Path(__file__).parent / "templates")
+
+_DEFAULT_LOGO = "/media/logo.png"
+
+
+async def _get_logo_url() -> str:
+    """Read company logo from DB at startup; fall back to default."""
+    try:
+        from app.models.company import CompanySettings
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(CompanySettings).where(CompanySettings.id == 1)
+            )
+            obj = result.scalar_one_or_none()
+            if obj and obj.logo_path:
+                return f"/{obj.logo_path}"
+    except Exception:
+        pass
+    return _DEFAULT_LOGO
 
 
 def create_admin(app: FastAPI) -> Admin:
@@ -35,7 +55,7 @@ def create_admin(app: FastAPI) -> Admin:
         authentication_backend=auth_backend,
         title="AeroHub",
         base_url="/admin",
-        logo_url="/media/logo.png",
+        logo_url=_DEFAULT_LOGO,
         favicon_url=None,
         templates_dir=_TEMPLATES_DIR,
     )
@@ -60,6 +80,9 @@ def create_admin(app: FastAPI) -> Admin:
     admin.add_view(CafeCategoryAdmin)
     admin.add_view(CafeItemAdmin)
     admin.add_view(CafeOrderAdmin)
+
+    # Settings
+    admin.add_view(CompanySettingsAdmin)
 
     # Analytics (read-only)
     admin.add_base_view(GenreStatsView)

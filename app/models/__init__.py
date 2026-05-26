@@ -4,6 +4,7 @@ from app.models.music import Music, Playlist, PlaylistTrack
 from app.models.analytics import ViewHistory, PlayHistory
 from app.models.content import Banner, FlightInfo
 from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem, OrderStatus
+from app.models.company import CompanySettings
 
 __all__ = [
     "User", "UserRole",
@@ -12,4 +13,5 @@ __all__ = [
     "ViewHistory", "PlayHistory",
     "Banner", "FlightInfo",
     "CafeCategory", "CafeItem", "CafeOrder", "CafeOrderItem", "OrderStatus",
+    "CompanySettings",
 ]

@@ -18,12 +18,13 @@ def _strip_extra(data: dict, extra_fields: FrozenSet[str]) -> tuple[dict, dict]:
 from app.db.session import AsyncSessionLocal
 from app.models.analytics import PlayHistory, ViewHistory
 from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem
+from app.models.company import CompanySettings
 from app.models.content import Banner, FlightInfo
 from app.models.movie import Movie, MovieCategory
 from app.models.music import Music, MusicCategory, Playlist, PlaylistTrack
 from app.models.user import User
 from app.services.analytics import get_genre_stats
-from app.services.media import upload_audio, upload_poster, upload_video, upload_cafe_image
+from app.services.media import upload_audio, upload_poster, upload_video, upload_cafe_image, upload_company_logo
 
 
 # ── Accounts ──────────────────────────────────────────────────────────────────
@@ -593,6 +594,47 @@ class CafeOrderAdmin(ModelView, model=CafeOrder):
 
     form_excluded_columns = [CafeOrder.items, CafeOrder.created_at, CafeOrder.updated_at]
     page_size = 50
+
+
+# ── Company / Branding ────────────────────────────────────────────────────────
+
+class CompanySettingsAdmin(ModelView, model=CompanySettings):
+    name = "Company Settings"
+    name_plural = "Company Settings"
+    icon = "fa-solid fa-building"
+    category = "Settings"
+
+    can_create = False
+    can_delete = False
+
+    column_list = [CompanySettings.airline_name, CompanySettings.logo_path, CompanySettings.updated_at]
+
+    column_labels = {
+        "airline_name": "Airline Name",
+        "logo_path": "Logo Path",
+        "updated_at": "Updated",
+    }
+
+    form_excluded_columns = [CompanySettings.logo_path, CompanySettings.updated_at]
+    page_size = 5
+
+    _EXTRA: FrozenSet[str] = frozenset({"logo_upload"})
+
+    async def scaffold_form(self) -> type:
+        form_class = await super().scaffold_form()
+        form_class.logo_upload = FileField("Logo Image (PNG/JPG/SVG/WebP — leave empty to keep current)")
+        return form_class
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
+    async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+        extra = getattr(request.state, "sqladmin_extra", {})
+        logo_file = extra.get("logo_upload")
+        if logo_file and getattr(logo_file, "filename", None):
+            model.logo_path = await upload_company_logo(logo_file)
 
 
 # ── Analytics (read-only) ──────────────────────────────────────────────────────
