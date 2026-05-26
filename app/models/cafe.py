@@ -50,7 +50,7 @@ class CafeItem(Base):
     category_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("cafe_categories.id", ondelete="SET NULL"), index=True
     )
-    category: Mapped["CafeCategory | None"] = relationship(back_populates="items")
+    category: Mapped["CafeCategory | None"] = relationship(back_populates="items", lazy="selectin")
 
     is_available: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_featured: Mapped[bool] = mapped_column(default=False, nullable=False)
