@@ -9,7 +9,7 @@ from app.admin.views import (
     BannerAdmin,
     CafeCategoryAdmin,
     CafeItemAdmin,
-    CafeOrderAdmin,
+    CafeOrdersView,
     CompanySettingsAdmin,
     FlightInfoAdmin,
     GenreStatsView,
@@ -28,10 +28,18 @@ from app.db.session import engine, AsyncSessionLocal
 _TEMPLATES_DIR = str(Path(__file__).parent / "templates")
 
 _DEFAULT_LOGO = "/media/logo.png"
+_admin: Admin | None = None
 
 
-async def _get_logo_url() -> str:
-    """Read company logo from DB at startup; fall back to default."""
+def set_admin_logo(logo_path: str | None) -> None:
+    """Update the sidebar logo at runtime without a server restart."""
+    if _admin is None:
+        return
+    _admin.logo_url = f"/{logo_path}" if logo_path else _DEFAULT_LOGO
+
+
+async def _load_logo_from_db() -> None:
+    """Read company logo from DB at startup and apply it."""
     try:
         from app.models.company import CompanySettings
         async with AsyncSessionLocal() as session:
@@ -39,14 +47,14 @@ async def _get_logo_url() -> str:
                 select(CompanySettings).where(CompanySettings.id == 1)
             )
             obj = result.scalar_one_or_none()
-            if obj and obj.logo_path:
-                return f"/{obj.logo_path}"
+            if obj:
+                set_admin_logo(obj.logo_path)
     except Exception:
         pass
-    return _DEFAULT_LOGO
 
 
 def create_admin(app: FastAPI) -> Admin:
+    global _admin
     auth_backend = AdminAuth(secret_key=settings.SECRET_KEY)
 
     admin = Admin(
@@ -59,6 +67,7 @@ def create_admin(app: FastAPI) -> Admin:
         favicon_url=None,
         templates_dir=_TEMPLATES_DIR,
     )
+    _admin = admin
 
     # Accounts
     admin.add_view(UserAdmin)
@@ -79,7 +88,7 @@ def create_admin(app: FastAPI) -> Admin:
     # Air Cafe
     admin.add_view(CafeCategoryAdmin)
     admin.add_view(CafeItemAdmin)
-    admin.add_view(CafeOrderAdmin)
+    admin.add_base_view(CafeOrdersView)
 
     # Settings
     admin.add_view(CompanySettingsAdmin)

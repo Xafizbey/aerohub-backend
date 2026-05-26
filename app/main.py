@@ -1,14 +1,15 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.admin import create_admin
+from app.admin import create_admin, _load_logo_from_db
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.middleware.logging import RequestLoggingMiddleware
+from app.services.websocket import order_ws
 from app.utils.exceptions import register_exception_handlers
 
 
@@ -27,6 +28,8 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as session:
         await get_or_create_settings(session)
         await session.commit()
+    # Apply saved logo to the sqladmin sidebar
+    await _load_logo_from_db()
     yield
 
 
@@ -68,6 +71,16 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 # ── Static media (served locally — no CDN in airplane) ───────────────────────
 app.mount("/media", StaticFiles(directory=str(settings.MEDIA_ROOT)), name="media")
+
+
+@app.websocket("/ws/orders")
+async def ws_orders(websocket: WebSocket):
+    await order_ws.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # keep-alive ping/pong
+    except WebSocketDisconnect:
+        order_ws.disconnect(websocket)
 
 
 @app.get("/health", tags=["Health"])

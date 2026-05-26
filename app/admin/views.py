@@ -1,11 +1,14 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, FrozenSet
 
 from markupsafe import Markup
 
 from sqladmin import BaseView, ModelView, expose
 from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from wtforms import FileField, SelectField
 
 
@@ -17,7 +20,7 @@ def _strip_extra(data: dict, extra_fields: FrozenSet[str]) -> tuple[dict, dict]:
 
 from app.db.session import AsyncSessionLocal
 from app.models.analytics import PlayHistory, ViewHistory
-from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem
+from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem, OrderStatus
 from app.models.company import CompanySettings
 from app.models.content import Banner, FlightInfo
 from app.models.movie import Movie, MovieCategory
@@ -569,31 +572,82 @@ class CafeItemAdmin(ModelView, model=CafeItem):
             model.is_available = False
 
 
-class CafeOrderAdmin(ModelView, model=CafeOrder):
-    name = "Cafe Order"
-    name_plural = "Cafe Orders"
+class CafeOrdersView(BaseView):
+    name = "Cafe Orders"
     icon = "fa-solid fa-receipt"
     category = "Air Cafe"
 
-    can_create = False
-    can_delete = False
+    @expose("/cafe-orders", methods=["GET"])
+    async def cafe_orders_page(self, request: Request):
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as session:
+            opts = selectinload(CafeOrder.items).selectinload(CafeOrderItem.item)
 
-    column_list = [
-        CafeOrder.id, CafeOrder.seat_number, CafeOrder.status,
-        CafeOrder.total_price, CafeOrder.created_at,
-    ]
-    column_filters = [CafeOrder.status, CafeOrder.seat_number, CafeOrder.created_at]
-    column_sortable_list = [CafeOrder.seat_number, CafeOrder.status, CafeOrder.total_price, CafeOrder.created_at]
-    column_default_sort = [(CafeOrder.created_at, True)]
+            pending = list((await session.execute(
+                select(CafeOrder).options(opts)
+                .where(CafeOrder.status == OrderStatus.pending)
+                .order_by(CafeOrder.created_at)
+            )).scalars().all())
 
-    column_labels = {
-        "seat_number": "Seat", "status": "Status",
-        "total_price": "Total ($)", "notes": "Notes",
-        "created_at": "Ordered At", "updated_at": "Updated",
-    }
+            in_progress = list((await session.execute(
+                select(CafeOrder).options(opts)
+                .where(CafeOrder.status.in_([OrderStatus.confirmed, OrderStatus.preparing]))
+                .order_by(CafeOrder.created_at)
+            )).scalars().all())
 
-    form_excluded_columns = [CafeOrder.items, CafeOrder.created_at, CafeOrder.updated_at]
-    page_size = 50
+            delivered = list((await session.execute(
+                select(CafeOrder).options(opts)
+                .where(CafeOrder.status == OrderStatus.delivered)
+                .order_by(CafeOrder.created_at.desc())
+                .limit(40)
+            )).scalars().all())
+
+        return await self.templates.TemplateResponse(
+            request,
+            "sqladmin/cafe_orders.html",
+            {
+                "pending": pending,
+                "in_progress": in_progress,
+                "delivered": delivered,
+                "now": now,
+                "title": "Cafe Orders",
+                "subtitle": (
+                    f"Live kitchen board · "
+                    f"{len(pending)} ожидают · "
+                    f"{len(in_progress)} готовятся"
+                ),
+            },
+        )
+
+    @expose("/cafe-orders/status", methods=["POST"])
+    async def update_order_status(self, request: Request):
+        from app.services.websocket import order_ws
+        form = await request.form()
+        order_id_str = str(form.get("order_id", ""))
+        status_str = str(form.get("status", ""))
+
+        try:
+            order_id = uuid.UUID(order_id_str)
+            status = OrderStatus(status_str)
+        except (ValueError, AttributeError):
+            return JSONResponse({"ok": False, "error": "Invalid data"}, status_code=400)
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(CafeOrder).where(CafeOrder.id == order_id)
+            )
+            order = result.scalar_one_or_none()
+            if not order:
+                return JSONResponse({"ok": False, "error": "Not found"}, status_code=404)
+            order.status = status
+            await session.commit()
+
+        await order_ws.broadcast({
+            "type": "status_changed",
+            "order_id": order_id_str,
+            "status": status_str,
+        })
+        return JSONResponse({"ok": True, "order_id": order_id_str, "status": status_str})
 
 
 # ── Company / Branding ────────────────────────────────────────────────────────
@@ -635,6 +689,10 @@ class CompanySettingsAdmin(ModelView, model=CompanySettings):
         logo_file = extra.get("logo_upload")
         if logo_file and getattr(logo_file, "filename", None):
             model.logo_path = await upload_company_logo(logo_file)
+
+    async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+        from app.admin import set_admin_logo
+        set_admin_logo(model.logo_path)
 
 
 # ── Analytics (read-only) ──────────────────────────────────────────────────────

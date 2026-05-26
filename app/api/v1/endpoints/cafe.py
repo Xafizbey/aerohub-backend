@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from fastapi import APIRouter, Depends, Query
@@ -13,6 +14,7 @@ from app.schemas.cafe import (
 from app.schemas.common import PaginatedResponse, MessageResponse
 from app.services import cafe as cafe_svc
 from app.services.auth import require_admin
+from app.services.websocket import order_ws
 
 router = APIRouter(prefix="/cafe", tags=["Air Cafe"])
 
@@ -60,7 +62,20 @@ async def get_item(item_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 async def create_order(data: OrderCreate, db: AsyncSession = Depends(get_db)):
     """Place a new food order from a seat."""
     order = await cafe_svc.create_order(data, db)
-    return await cafe_svc.get_order(order.id, db)
+    full = await cafe_svc.get_order(order.id, db)
+    asyncio.create_task(order_ws.broadcast({
+        "type": "new_order",
+        "order_id": str(full.id),
+        "seat_number": full.seat_number,
+        "total_price": full.total_price,
+        "notes": full.notes,
+        "created_at": full.created_at.isoformat(),
+        "items": [
+            {"name": oi.item.name, "qty": oi.quantity, "price": oi.unit_price}
+            for oi in full.items
+        ],
+    }))
+    return full
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut)
@@ -81,6 +96,11 @@ async def update_order_status(
     _: User = Depends(require_admin),
 ):
     await cafe_svc.update_order_status(order_id, data.status, db)
+    asyncio.create_task(order_ws.broadcast({
+        "type": "status_changed",
+        "order_id": str(order_id),
+        "status": data.status.value,
+    }))
     return await cafe_svc.get_order(order_id, db)
 
 

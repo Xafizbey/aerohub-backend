@@ -1,0 +1,416 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content_header %}
+<div class="row align-items-center">
+  <div class="col">
+    <h2 class="page-title" style="display:flex;align-items:center;gap:.5rem;">
+      <span id="ws-dot" class="ws-dot ws-dot--off" title="WebSocket"></span>
+      Air Cafe — Заказы
+    </h2>
+    <div class="page-pretitle">Мониторинг в реальном времени</div>
+  </div>
+  <div class="col-auto">
+    <button onclick="location.reload()" class="btn btn-sm btn-outline-secondary">
+      <i class="fa-solid fa-rotate-right me-1"></i>Обновить
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.ws-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0; transition: background .3s;
+}
+.ws-dot--off { background: #9ca3af; }
+.ws-dot--on  { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2);
+               animation: ws-pulse 2s ease-in-out infinite; }
+@keyframes ws-pulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+  50%      { box-shadow: 0 0 0 5px rgba(34,197,94,.05); }
+}
+
+/* ── Stat cards ─────────────────────────────────────────────────────────── */
+.stat-card {
+  border-radius: 10px; padding: 1.1rem 1.4rem;
+  display: flex; align-items: center; gap: 1rem;
+  border: 1px solid rgba(255,255,255,.06);
+}
+[data-bs-theme="light"] .stat-card { border-color: #e5e7eb; background:#f9fafb; }
+[data-bs-theme="dark"]  .stat-card { background: #1e2535; }
+
+.stat-icon {
+  width: 42px; height: 42px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.stat-icon--pending   { background: rgba(245,158,11,.15); color:#f59e0b; }
+.stat-icon--preparing { background: rgba(249,115,22,.15); color:#f97316; }
+.stat-icon--delivered { background: rgba(34,197,94,.15);  color:#22c55e; }
+.stat-icon--cancelled { background: rgba(239,68,68,.15);  color:#ef4444; }
+
+.stat-label { font-size: .72rem; font-weight:600; text-transform:uppercase;
+              letter-spacing:.04em; opacity:.55; }
+.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+
+/* ── Status badge ───────────────────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .25rem .65rem; border-radius: 99px;
+  font-size: .72rem; font-weight: 600; white-space: nowrap;
+}
+.status-pill--pending   { background:rgba(245,158,11,.15); color:#f59e0b; }
+.status-pill--confirmed { background:rgba(59,130,246,.15);  color:#3b82f6; }
+.status-pill--preparing { background:rgba(249,115,22,.15);  color:#f97316; }
+.status-pill--delivered { background:rgba(34,197,94,.15);   color:#22c55e; }
+.status-pill--cancelled { background:rgba(239,68,68,.12);   color:#ef4444; }
+
+/* ── Orders table ───────────────────────────────────────────────────────── */
+.orders-table { width:100%; border-collapse:collapse; }
+.orders-table th {
+  font-size:.7rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; opacity:.45; padding:.6rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  white-space: nowrap;
+}
+[data-bs-theme="light"] .orders-table th { border-color:#e5e7eb; }
+
+.orders-table td {
+  padding: .75rem 1rem; vertical-align: middle;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  font-size: .875rem;
+}
+[data-bs-theme="light"] .orders-table td { border-color: #f3f4f6; }
+
+.orders-table tbody tr:hover { background: rgba(255,255,255,.03); }
+[data-bs-theme="light"] .orders-table tbody tr:hover { background:#f9fafb; }
+
+.seat-badge {
+  display:inline-block; padding:.2rem .55rem; border-radius:6px;
+  font-size:.78rem; font-weight:700; letter-spacing:.03em;
+  background:rgba(99,102,241,.15); color:#818cf8;
+}
+[data-bs-theme="light"] .seat-badge { background:#ede9fe; color:#6d28d9; }
+
+.items-list { list-style:none; margin:0; padding:0; }
+.items-list li { display:flex; gap:.35rem; align-items:baseline;
+                 font-size:.8rem; line-height:1.6; }
+.items-list .qty { opacity:.5; font-size:.73rem; }
+
+.action-btn {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.3rem .75rem; border-radius:7px; border:none;
+  font-size:.78rem; font-weight:600; cursor:pointer;
+  transition:opacity .15s, transform .1s;
+}
+.action-btn:hover  { opacity:.85; }
+.action-btn:active { transform:scale(.97); }
+.action-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+.action-btn--confirm  { background:rgba(59,130,246,.15); color:#3b82f6; }
+.action-btn--start    { background:rgba(249,115,22,.15);  color:#f97316; }
+.action-btn--deliver  { background:rgba(34,197,94,.15);   color:#22c55e; }
+.action-btn--cancel   { background:rgba(239,68,68,.1);    color:#ef4444; }
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+.section-head {
+  display:flex; align-items:center; gap:.5rem;
+  font-size:.72rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; opacity:.4; padding:.5rem 1rem .4rem;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty-row td {
+  text-align:center; padding:2rem; opacity:.35;
+  font-size:.85rem;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+#ko-toasts {
+  position:fixed; bottom:1.2rem; right:1.2rem; z-index:9999;
+  display:flex; flex-direction:column; gap:.5rem; pointer-events:none;
+}
+.ko-toast {
+  padding:.65rem 1rem; border-radius:9px; font-size:.82rem;
+  display:flex; align-items:center; gap:.6rem;
+  animation: toast-in .22s ease;
+  pointer-events:auto;
+  min-width:220px; max-width:300px;
+}
+[data-bs-theme="dark"]  .ko-toast { background:#1e2535; border:1px solid rgba(255,255,255,.08); }
+[data-bs-theme="light"] .ko-toast { background:#fff; border:1px solid #e5e7eb;
+                                     box-shadow:0 4px 12px rgba(0,0,0,.1); }
+@keyframes toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+</style>
+
+{# ── STAT CARDS ──────────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon--pending"><i class="fa-solid fa-clock"></i></div>
+      <div>
+        <div class="stat-label">Ожидают</div>
+        <div class="stat-value" id="cnt-pending">{{ pending | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon--preparing"><i class="fa-solid fa-fire-burner"></i></div>
+      <div>
+        <div class="stat-label">Готовятся</div>
+        <div class="stat-value" id="cnt-preparing">{{ in_progress | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon--delivered"><i class="fa-solid fa-circle-check"></i></div>
+      <div>
+        <div class="stat-label">Доставлено</div>
+        <div class="stat-value">{{ delivered | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon--cancelled"><i class="fa-solid fa-ban"></i></div>
+      <div>
+        <div class="stat-label">Всего сегодня</div>
+        <div class="stat-value">{{ (pending | length) + (in_progress | length) + (delivered | length) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── ORDERS TABLE ─────────────────────────────────────────────────────────── #}
+<div class="card" style="border-radius:12px; overflow:hidden;">
+  <div style="overflow-x:auto;">
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th style="padding-left:1.2rem;">Заказ</th>
+          <th>Место</th>
+          <th>Состав</th>
+          <th>Сумма</th>
+          <th>Статус</th>
+          <th>Время</th>
+          <th style="padding-right:1.2rem;">Действие</th>
+        </tr>
+      </thead>
+      <tbody id="orders-tbody">
+
+        {# Pending #}
+        {% if pending %}
+        <tr><td colspan="7"><div class="section-head"><i class="fa-solid fa-clock"></i> Ожидают подтверждения</div></td></tr>
+        {% for order in pending %}
+        {% set oid = order.id | string %}
+        {% set elapsed_s = ((now - order.created_at).total_seconds()) | int if order.created_at.tzinfo else ((now.replace(tzinfo=none) - order.created_at).total_seconds()) | int %}
+        {% set elapsed_m = (elapsed_s // 60) | int %}
+        {% set elapsed_str = 'только что' if elapsed_m < 1 else (elapsed_m | string + ' мин') if elapsed_m < 60 else ((elapsed_m // 60) | string + ' ч ' + (elapsed_m % 60) | string + ' мин') %}
+        <tr id="row-{{ oid }}" data-order-id="{{ oid }}">
+          <td style="padding-left:1.2rem; font-weight:600; font-size:.8rem; opacity:.6;">#{{ (oid[:8]) | upper }}</td>
+          <td><span class="seat-badge">{{ order.seat_number }}</span></td>
+          <td>
+            <ul class="items-list">
+              {% for oi in order.items %}
+              <li>
+                <span class="qty">{{ oi.quantity }}×</span>
+                {{ oi.item.name if oi.item else '—' }}
+              </li>
+              {% endfor %}
+            </ul>
+            {% if order.notes %}<div style="font-size:.73rem;opacity:.45;margin-top:.2rem;"><i class="fa-solid fa-note-sticky fa-xs"></i> {{ order.notes }}</div>{% endif %}
+          </td>
+          <td style="font-weight:600; white-space:nowrap;">${{ '%.2f' % order.total_price }}</td>
+          <td><span class="status-pill status-pill--pending"><i class="fa-regular fa-clock fa-xs"></i> Ожидает</span></td>
+          <td style="font-size:.78rem; opacity:.5; white-space:nowrap;">{{ elapsed_str }}</td>
+          <td style="padding-right:1.2rem;">
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+              <button class="action-btn action-btn--confirm" onclick="doStatus('{{ oid }}', 'confirmed', this)">
+                <i class="fa-solid fa-circle-check fa-xs"></i> Принять
+              </button>
+              <button class="action-btn action-btn--cancel" onclick="doStatus('{{ oid }}', 'cancelled', this)">
+                <i class="fa-solid fa-xmark fa-xs"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+
+        {# In Progress #}
+        {% if in_progress %}
+        <tr><td colspan="7"><div class="section-head"><i class="fa-solid fa-fire-burner"></i> Готовятся</div></td></tr>
+        {% for order in in_progress %}
+        {% set oid = order.id | string %}
+        {% set elapsed_s = ((now - order.created_at).total_seconds()) | int if order.created_at.tzinfo else ((now.replace(tzinfo=none) - order.created_at).total_seconds()) | int %}
+        {% set elapsed_m = (elapsed_s // 60) | int %}
+        {% set elapsed_str = 'только что' if elapsed_m < 1 else (elapsed_m | string + ' мин') if elapsed_m < 60 else ((elapsed_m // 60) | string + ' ч ' + (elapsed_m % 60) | string + ' мин') %}
+        <tr id="row-{{ oid }}" data-order-id="{{ oid }}">
+          <td style="padding-left:1.2rem; font-weight:600; font-size:.8rem; opacity:.6;">#{{ (oid[:8]) | upper }}</td>
+          <td><span class="seat-badge">{{ order.seat_number }}</span></td>
+          <td>
+            <ul class="items-list">
+              {% for oi in order.items %}
+              <li>
+                <span class="qty">{{ oi.quantity }}×</span>
+                {{ oi.item.name if oi.item else '—' }}
+              </li>
+              {% endfor %}
+            </ul>
+            {% if order.notes %}<div style="font-size:.73rem;opacity:.45;margin-top:.2rem;"><i class="fa-solid fa-note-sticky fa-xs"></i> {{ order.notes }}</div>{% endif %}
+          </td>
+          <td style="font-weight:600; white-space:nowrap;">${{ '%.2f' % order.total_price }}</td>
+          <td>
+            {% if order.status.value == 'confirmed' %}
+            <span class="status-pill status-pill--confirmed"><i class="fa-solid fa-circle-check fa-xs"></i> Принято</span>
+            {% else %}
+            <span class="status-pill status-pill--preparing"><i class="fa-solid fa-fire fa-xs"></i> Готовится</span>
+            {% endif %}
+          </td>
+          <td style="font-size:.78rem; opacity:.5; white-space:nowrap;">{{ elapsed_str }}</td>
+          <td style="padding-right:1.2rem;">
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+              {% if order.status.value == 'confirmed' %}
+              <button class="action-btn action-btn--start" onclick="doStatus('{{ oid }}', 'preparing', this)">
+                <i class="fa-solid fa-fire fa-xs"></i> Готовить
+              </button>
+              {% else %}
+              <button class="action-btn action-btn--deliver" onclick="doStatus('{{ oid }}', 'delivered', this)">
+                <i class="fa-solid fa-circle-check fa-xs"></i> Доставлен
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+
+        {# Delivered #}
+        {% if delivered %}
+        <tr><td colspan="7"><div class="section-head"><i class="fa-solid fa-circle-check"></i> Доставлены (последние 40)</div></td></tr>
+        {% for order in delivered %}
+        {% set oid = order.id | string %}
+        {% set elapsed_s = ((now - order.created_at).total_seconds()) | int if order.created_at.tzinfo else ((now.replace(tzinfo=none) - order.created_at).total_seconds()) | int %}
+        {% set elapsed_m = (elapsed_s // 60) | int %}
+        {% set elapsed_str = 'только что' if elapsed_m < 1 else (elapsed_m | string + ' мин') if elapsed_m < 60 else ((elapsed_m // 60) | string + ' ч ' + (elapsed_m % 60) | string + ' мин') %}
+        <tr id="row-{{ oid }}" style="opacity:.6;">
+          <td style="padding-left:1.2rem; font-weight:600; font-size:.8rem; opacity:.6;">#{{ (oid[:8]) | upper }}</td>
+          <td><span class="seat-badge">{{ order.seat_number }}</span></td>
+          <td>
+            <ul class="items-list">
+              {% for oi in order.items %}
+              <li>
+                <span class="qty">{{ oi.quantity }}×</span>
+                {{ oi.item.name if oi.item else '—' }}
+              </li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td style="font-weight:600; white-space:nowrap;">${{ '%.2f' % order.total_price }}</td>
+          <td><span class="status-pill status-pill--delivered"><i class="fa-solid fa-check fa-xs"></i> Доставлен</span></td>
+          <td style="font-size:.78rem; opacity:.5; white-space:nowrap;">{{ elapsed_str }}</td>
+          <td style="padding-right:1.2rem;"></td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+
+        {# Empty #}
+        {% if not pending and not in_progress and not delivered %}
+        <tr class="empty-row"><td colspan="7"><i class="fa-solid fa-mug-hot fa-lg me-2"></i>Заказов нет</td></tr>
+        {% endif %}
+
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# Toast container #}
+<div id="ko-toasts"></div>
+
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+<script>
+(function () {
+'use strict';
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+function showToast(msg, type) {
+  var icons = { new: '🔔', delivered: '✅', error: '⚠️', info: 'ℹ️' };
+  var el = document.createElement('div');
+  el.className = 'ko-toast';
+  el.innerHTML = '<span style="font-size:1rem;">' + (icons[type] || 'ℹ️') + '</span><span>' + msg + '</span>';
+  document.getElementById('ko-toasts').prepend(el);
+  setTimeout(function () {
+    el.style.opacity = '0'; el.style.transition = 'opacity .2s';
+    setTimeout(function () { el.remove(); }, 220);
+  }, 4000);
+}
+
+/* ── Status change ─────────────────────────────────────────────────────── */
+async function doStatus(orderId, status, btn) {
+  btn.disabled = true;
+  try {
+    var resp = await fetch('/admin/cafe-orders/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'order_id=' + encodeURIComponent(orderId) + '&status=' + encodeURIComponent(status),
+    });
+    if (!resp.ok) throw new Error();
+    setTimeout(function () { location.reload(); }, 150);
+  } catch (e) {
+    btn.disabled = false;
+    showToast('Не удалось изменить статус', 'error');
+  }
+}
+
+/* ── WebSocket ─────────────────────────────────────────────────────────── */
+var dot = document.getElementById('ws-dot');
+var ws, reconnectTimer;
+
+function wsConnect() {
+  var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws/orders');
+  ws.onopen  = function () { dot.className = 'ws-dot ws-dot--on'; clearTimeout(reconnectTimer); };
+  ws.onclose = function () { dot.className = 'ws-dot ws-dot--off'; reconnectTimer = setTimeout(wsConnect, 4000); };
+  ws.onerror = function () { dot.className = 'ws-dot ws-dot--off'; };
+  ws.onmessage = function (e) {
+    var data; try { data = JSON.parse(e.data); } catch (_) { return; }
+    if (data.type === 'new_order') {
+      var cnt = document.getElementById('cnt-pending');
+      if (cnt) cnt.textContent = parseInt(cnt.textContent || '0') + 1;
+      playBeep();
+      showToast('Новый заказ · Место ' + data.seat_number + ' · $' + parseFloat(data.total_price).toFixed(2), 'new');
+    } else if (data.type === 'status_changed') {
+      var labels = { confirmed:'принят', preparing:'готовится', delivered:'доставлен', cancelled:'отменён' };
+      showToast('Заказ ' + (labels[data.status] || data.status), 'info');
+      setTimeout(function () { location.reload(); }, 800);
+    }
+  };
+}
+
+function playBeep() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 140].forEach(function (d) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0, ctx.currentTime + d/1000);
+      g.gain.linearRampToValueAtTime(0.15, ctx.currentTime + d/1000 + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + d/1000 + 0.3);
+      o.start(ctx.currentTime + d/1000); o.stop(ctx.currentTime + d/1000 + 0.35);
+    });
+  } catch (_) {}
+}
+
+window.doStatus = doStatus;
+setTimeout(function () { location.reload(); }, 60000);
+wsConnect();
+})();
+</script>
+{% endblock %}
