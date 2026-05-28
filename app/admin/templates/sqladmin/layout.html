@@ -27,8 +27,9 @@
 
 /* ── Sidebar width (Tabler keeps position:fixed) ─────────── */
 .navbar-vertical.navbar-expand-lg {
-  width: var(--ah-sb-w) !important;
-  overflow-y: auto !important;         /* auto, not always-on scroll */
+  width:    var(--ah-sb-w) !important;
+  height:   100vh          !important;
+  overflow: hidden         !important;
 }
 
 /* Push page content right of sidebar */
@@ -41,9 +42,9 @@
 .navbar-vertical.navbar-expand-lg > [class^="container"] {
   display:        flex        !important;
   flex-direction: column      !important;
-  min-height:     100vh       !important;
+  height:         100%        !important;
   padding:        0           !important;
-  overflow:       hidden;
+  overflow:       hidden      !important;
 }
 
 /* ── Dark sidebar ─────────────────────────────────────────── */
@@ -84,7 +85,7 @@
 [data-bs-theme="light"] .ah-brand { border-color: rgba(0,0,0,.08);}
 
 .ah-brand-logo {
-  height: 32px;
+  height: 24px;
   width: auto;
   display: block;
   object-fit: contain;
@@ -101,10 +102,8 @@
   flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: .5rem 0 .75rem;
 }
-.ah-nav-scroll::-webkit-scrollbar { width: 3px; }
-.ah-nav-scroll::-webkit-scrollbar-track { background: transparent; }
-[data-bs-theme="dark"]  .ah-nav-scroll::-webkit-scrollbar-thumb { background: rgba(99,157,255,.15); border-radius: 2px; }
-[data-bs-theme="light"] .ah-nav-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12);      border-radius: 2px; }
+.ah-nav-scroll::-webkit-scrollbar { display: none; }
+.ah-nav-scroll { scrollbar-width: none; }
 
 .ah-nav-list { list-style: none; margin: 0; padding: 0; }
 .ah-nav-section { margin-top: .2rem; }
@@ -421,6 +420,16 @@ var T = {
   'Content': 'Контент',
   'Analytics': 'Аналитика',
   'Air Cafe': 'Бортовое кафе',
+  'Settings': 'Настройки',
+  /* ── Music model names ──────────────── */
+  'Music Categories': 'Категории музыки',
+  /* ── Settings model names ───────────── */
+  'Company Settings': 'Настройки компании',
+  /* ── Destinations model names ───────── */
+  'Destination': 'Направление',
+  'Destinations': 'Направления',
+  'Photo': 'Фото',
+  'Destination Photos': 'Фото направлений',
   /* ── Air Cafe model names ────────────── */
   'Cafe Categories': 'Категории кафе',
   'Menu Item': 'Позиция меню',

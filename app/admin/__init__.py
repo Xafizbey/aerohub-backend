@@ -11,6 +11,8 @@ from app.admin.views import (
     CafeItemAdmin,
     CafeOrdersView,
     CompanySettingsAdmin,
+    DestinationAdmin,
+    DestinationPhotoAdmin,
     FlightInfoAdmin,
     GenreStatsView,
     MovieAdmin,
@@ -64,7 +66,7 @@ def create_admin(app: FastAPI) -> Admin:
         title="AeroHub",
         base_url="/admin",
         logo_url=_DEFAULT_LOGO,
-        favicon_url=None,
+        favicon_url="/static/favicon.png",
         templates_dir=_TEMPLATES_DIR,
     )
     _admin = admin
@@ -84,6 +86,8 @@ def create_admin(app: FastAPI) -> Admin:
     # Content
     admin.add_view(BannerAdmin)
     admin.add_view(FlightInfoAdmin)
+    admin.add_view(DestinationAdmin)
+    admin.add_view(DestinationPhotoAdmin)
 
     # Air Cafe
     admin.add_view(CafeCategoryAdmin)

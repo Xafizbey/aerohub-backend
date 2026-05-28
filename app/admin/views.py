@@ -23,11 +23,12 @@ from app.models.analytics import PlayHistory, ViewHistory
 from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem, OrderStatus
 from app.models.company import CompanySettings
 from app.models.content import Banner, FlightInfo
+from app.models.destination import Destination, DestinationPhoto
 from app.models.movie import Movie, MovieCategory
 from app.models.music import Music, MusicCategory, Playlist, PlaylistTrack
 from app.models.user import User
 from app.services.analytics import get_genre_stats
-from app.services.media import upload_audio, upload_poster, upload_video, upload_cafe_image, upload_company_logo
+from app.services.media import upload_audio, upload_poster, upload_video, upload_cafe_image, upload_company_logo, upload_destination_photo
 
 
 # ── Accounts ──────────────────────────────────────────────────────────────────
@@ -498,7 +499,7 @@ class CafeItemAdmin(ModelView, model=CafeItem):
     category = "Air Cafe"
 
     column_list = [
-        CafeItem.name, CafeItem.category, CafeItem.price,
+        "image_path", CafeItem.name, CafeItem.category, CafeItem.price,
         CafeItem.stock, CafeItem.is_available, CafeItem.is_featured, CafeItem.is_chef_special,
         CafeItem.order_count, CafeItem.created_at,
     ]
@@ -508,6 +509,10 @@ class CafeItemAdmin(ModelView, model=CafeItem):
     column_default_sort = [(CafeItem.created_at, True)]
 
     column_formatters = {
+        "image_path": lambda m, a: Markup(
+            '<img src="/{p}" style="width:38px;height:38px;object-fit:cover;border-radius:7px;display:block;" '
+            'onerror="this.style.display=\'none\'">'.format(p=m.image_path)
+        ) if m.image_path else Markup('<span style="opacity:.25;font-size:.8rem;">—</span>'),
         "name": lambda m, a: Markup(
             '<span class="ah-lang-val" data-en="{en}" data-ru="{ru}">{en}</span>'.format(
                 en=m.name or "",
@@ -527,7 +532,7 @@ class CafeItemAdmin(ModelView, model=CafeItem):
         "description": "Description (EN)", "description_ru": "Description (RU)",
         "description_kk": "Description (KZ)", "description_ky": "Description (KY)",
         "ingredients": "Ingredients", "price": "Price ($)",
-        "image_path": "Image Path", "category": "Category",
+        "image_path": "Photo", "category": "Category",
         "stock": "Stock", "is_available": "Available", "is_featured": "Featured",
         "is_chef_special": "Chef Special", "is_duty_free": "Duty Free",
         "is_published": "Published", "order_count": "Orders", "like_count": "Likes",
@@ -693,6 +698,105 @@ class CompanySettingsAdmin(ModelView, model=CompanySettings):
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
         from app.admin import set_admin_logo
         set_admin_logo(model.logo_path)
+
+
+# ── Destinations ─────────────────────────────────────────────────────────────
+
+class DestinationAdmin(ModelView, model=Destination):
+    name = "Destination"
+    name_plural = "Destinations"
+    icon = "fa-solid fa-map-location-dot"
+    category = "Content"
+
+    column_list = [
+        Destination.id, Destination.name, Destination.iata_code,
+        Destination.country, Destination.region,
+        Destination.is_active, Destination.display_order,
+    ]
+    column_searchable_list = [
+        Destination.name, Destination.name_ru, Destination.iata_code,
+        Destination.country, Destination.region,
+    ]
+    column_filters = [Destination.is_active, Destination.region]
+    column_sortable_list = [
+        Destination.name, Destination.iata_code, Destination.display_order,
+        Destination.is_active, Destination.country,
+    ]
+    column_default_sort = [(Destination.display_order, False)]
+
+    column_labels = {
+        "name": "City (EN)", "name_ru": "City (RU)", "name_kk": "City (KZ)", "name_ky": "City (KY)",
+        "iata_code": "IATA Code",
+        "country": "Country (EN)", "country_ru": "Country (RU)",
+        "country_kk": "Country (KZ)", "country_ky": "Country (KY)",
+        "region": "Region",
+        "subtitle": "Subtitle (EN)", "subtitle_ru": "Subtitle (RU)",
+        "subtitle_kk": "Subtitle (KZ)", "subtitle_ky": "Subtitle (KY)",
+        "description": "Description (EN)", "description_ru": "Description (RU)",
+        "description_kk": "Description (KZ)", "description_ky": "Description (KY)",
+        "coords": "Coordinates", "timezone": "Timezone",
+        "airport_info": "Airport", "airport_hint": "Airport Hint",
+        "currency": "Currency", "currency_hint": "Currency Hint",
+        "language_info": "Language", "language_hint": "Language Hint",
+        "plug_info": "Plug Type", "plug_hint": "Plug Hint",
+        "flight_duration": "Flight Duration",
+        "is_active": "Active", "display_order": "Order",
+        "created_at": "Created", "updated_at": "Updated",
+    }
+
+    form_excluded_columns = [
+        Destination.created_at, Destination.updated_at, Destination.photos,
+    ]
+    page_size = 25
+
+
+class DestinationPhotoAdmin(ModelView, model=DestinationPhoto):
+    name = "Photo"
+    name_plural = "Destination Photos"
+    icon = "fa-solid fa-images"
+    category = "Content"
+
+    column_list = [
+        DestinationPhoto.id, DestinationPhoto.destination,
+        DestinationPhoto.caption, DestinationPhoto.display_order,
+    ]
+    column_searchable_list = [DestinationPhoto.caption]
+    column_sortable_list = [DestinationPhoto.destination_id, DestinationPhoto.display_order]
+    column_default_sort = [(DestinationPhoto.destination_id, False), (DestinationPhoto.display_order, False)]
+
+    column_labels = {
+        "destination": "Destination",
+        "photo_path": "Photo Path",
+        "caption": "Caption (EN)", "caption_ru": "Caption (RU)",
+        "caption_kk": "Caption (KZ)", "caption_ky": "Caption (KY)",
+        "display_order": "Order",
+    }
+
+    form_excluded_columns = [DestinationPhoto.photo_path]
+    page_size = 50
+
+    _EXTRA: FrozenSet[str] = frozenset({"photo_upload"})
+
+    async def scaffold_form(self) -> type:
+        form_class = await super().scaffold_form()
+        form_class.photo_upload = FileField("Photo (JPEG/PNG/WebP)")
+        return form_class
+
+    async def insert_model(self, request: Request, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().insert_model(request, clean)
+
+    async def update_model(self, request: Request, pk: Any, data: Dict[str, Any]) -> Any:
+        clean, extra = _strip_extra(data, self._EXTRA)
+        request.state.sqladmin_extra = extra
+        return await super().update_model(request, pk, clean)
+
+    async def on_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+        extra = getattr(request.state, "sqladmin_extra", {})
+        photo_file = extra.get("photo_upload")
+        if photo_file and getattr(photo_file, "filename", None):
+            model.photo_path = await upload_destination_photo(photo_file)
 
 
 # ── Analytics (read-only) ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ from app.models.movie import Movie, MovieCategory
 from app.models.music import Music, Playlist, PlaylistTrack
 from app.models.analytics import ViewHistory, PlayHistory
 from app.models.content import Banner, FlightInfo
+from app.models.destination import Destination, DestinationPhoto
 from app.models.cafe import CafeCategory, CafeItem, CafeOrder, CafeOrderItem, OrderStatus
 from app.models.company import CompanySettings
 
@@ -12,6 +13,7 @@ __all__ = [
     "Music", "Playlist", "PlaylistTrack",
     "ViewHistory", "PlayHistory",
     "Banner", "FlightInfo",
+    "Destination", "DestinationPhoto",
     "CafeCategory", "CafeItem", "CafeOrder", "CafeOrderItem", "OrderStatus",
     "CompanySettings",
 ]
