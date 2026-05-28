@@ -90,7 +90,7 @@ class DestinationPhoto(Base):
 
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    destination: Mapped["Destination"] = relationship("Destination", back_populates="photos")
+    destination: Mapped["Destination"] = relationship("Destination", back_populates="photos", lazy="selectin")
 
     def __str__(self) -> str:
         return f"Photo #{self.id} for destination {self.destination_id}"
