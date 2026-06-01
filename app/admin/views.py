@@ -693,7 +693,7 @@ class CompanySettingsAdmin(ModelView, model=CompanySettings):
         extra = getattr(request.state, "sqladmin_extra", {})
         logo_file = extra.get("logo_upload")
         if logo_file and getattr(logo_file, "filename", None):
-            model.logo_path = await upload_company_logo(logo_file)
+            model.logo_path = await upload_company_logo(logo_file, old_path=model.logo_path)
 
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
         from app.admin import set_admin_logo

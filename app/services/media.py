@@ -111,7 +111,7 @@ async def upload_cafe_image(file: UploadFile) -> str:
 ALLOWED_LOGO_TYPES = {"image/jpeg", "image/png", "image/webp", "image/svg+xml"}
 
 
-async def upload_company_logo(file: UploadFile) -> str:
+async def upload_company_logo(file: UploadFile, old_path: str | None = None) -> str:
     if file.content_type not in ALLOWED_LOGO_TYPES:
         raise HTTPException(status_code=415, detail="Only JPEG/PNG/WebP/SVG images are accepted")
 
@@ -125,10 +125,14 @@ async def upload_company_logo(file: UploadFile) -> str:
     suffix = Path(file.filename or "logo").suffix or ".png"
     dest = settings.MEDIA_ROOT / "logos"
     dest.mkdir(parents=True, exist_ok=True)
-    # Always write to the same filename so the URL stays stable
-    filename = f"logo{suffix}"
+    filename = f"{uuid.uuid4()}{suffix}"
     path = dest / filename
     path.write_bytes(content)
+
+    # Remove previous logo file so stale files don't accumulate
+    if old_path:
+        old_file = settings.MEDIA_ROOT.parent / old_path
+        old_file.unlink(missing_ok=True)
 
     relative = f"media/logos/{filename}"
     logger.info("Company logo saved: %s", relative)

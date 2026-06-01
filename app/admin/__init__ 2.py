@@ -1,5 +1,4 @@
 from pathlib import Path
-from time import time
 
 from fastapi import FastAPI
 from sqladmin import Admin
@@ -38,10 +37,7 @@ def set_admin_logo(logo_path: str | None) -> None:
     """Update the sidebar logo at runtime without a server restart."""
     if _admin is None:
         return
-    if logo_path:
-        _admin.logo_url = f"/{logo_path}?v={int(time())}"
-    else:
-        _admin.logo_url = _DEFAULT_LOGO
+    _admin.logo_url = f"/{logo_path}" if logo_path else _DEFAULT_LOGO
 
 
 async def _load_logo_from_db() -> None:

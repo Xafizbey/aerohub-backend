@@ -36,8 +36,8 @@ async def upload_logo(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    path = await upload_company_logo(logo)
     obj = await get_or_create_settings(db)
+    path = await upload_company_logo(logo, old_path=obj.logo_path)
     obj.logo_path = path
     await db.flush()
     await db.refresh(obj)
