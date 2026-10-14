@@ -1,0 +1,95 @@
+# Production: PostgreSQL + API + Nginx
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Migrations run automatically (the "migrate" service) before the API starts.
+# App settings come from .env (see .env.example). Required there:
+#   SECRET_KEY        — openssl rand -hex 32
+#   DATABASE_PASSWORD — openssl rand -hex 16 (no @ : / — it goes into a URL)
+# Optional: HTTP_PORT (default 80) — host port for nginx.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-api: &api
+  build: .
+  image: aerohub-api:latest
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-aerohub}:${DATABASE_PASSWORD:?set DATABASE_PASSWORD in .env}@db:5432/${DATABASE_NAME:-aerohub_db}
+    APP_ENV: production
+    DEBUG: "false"                      # true turns on SQL echo in logs
+    MEDIA_ROOT: /app/media
+    LOG_FILE: /app/logs/aerohub.log
+  volumes:
+    - media_data:/app/media
+    - log_data:/app/logs
+  logging: *logging
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-aerohub_db}
+      POSTGRES_USER: ${DATABASE_USER:-aerohub}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?set DATABASE_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No published ports — reachable only from inside the compose network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *api
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api
+    # Single worker on purpose: WebSocket clients (/ws/orders) live in process memory
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips=*
+    ports:
+      - "127.0.0.1:8000:8000"           # local access only; public traffic goes through nginx
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/aerohub.conf:/etc/nginx/conf.d/default.conf:ro
+      - media_data:/app/media:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  postgres_data:
+  media_data:
+  log_data:
